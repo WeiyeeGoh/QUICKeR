@@ -1,4 +1,3 @@
-
 #include <signal.h>
 #include <pthread.h>
 #include <actions.h>
@@ -30,7 +29,7 @@ CK_SESSION_HANDLE reuse_session2;
 char* reuse_message;
 int reuse_message_size;
 int current_pid = NULL;
-double time_expired = false;
+double time_expired = 0;
 
 
 
@@ -100,7 +99,7 @@ char* get_ip_address()
 
 void timeron (int interval) {
     sleep (interval);
-    time_expired = true;
+    time_expired = 1;
 
 }
 
@@ -115,7 +114,7 @@ void TimerSet (int interval) {
 
 int main (int argc, char** argv) {
     int count_forks = 0;
-    bool parent = true;
+    int parent = 1;
     int pid = NULL;
     while (parent && count_forks < num_forks) {
         count_forks ++;
@@ -241,7 +240,7 @@ int main (int argc, char** argv) {
     TimerSet (170);
 
     double thisstart = get_time_in_seconds();
-    while (time_expired == false) {
+    while (time_expired == 0) {
         
         int db_key_index = total_messages % num_of_db_keys;
         int rv = update_dek_key ( &reuse_session, database_keys[db_key_index], key_handle);
@@ -266,4 +265,3 @@ int main (int argc, char** argv) {
     pkcs11_finalize_session(reuse_session);
 
 }
-

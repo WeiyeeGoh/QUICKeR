@@ -2,8 +2,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <common.h>
-#include <aes_wrapping_common.h>
-#include <storage.h>
 #include <stdint.h>
 #include <string.h>
 #include <time.h>
@@ -130,4 +128,3 @@ int updatable_update_dek_and_ciphertext(CK_SESSION_HANDLE_PTR session,
                         		CK_OBJECT_HANDLE wrapping_key_handle, 
 					char* ciphertext_id, 
                                         int total_re_encrypts);
-

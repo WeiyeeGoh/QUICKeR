@@ -169,7 +169,7 @@ int encrypt_and_upload(CK_SESSION_HANDLE_PTR session, CK_OBJECT_HANDLE wrapping_
 
 
     int fail_counter = 0;
-    while(true) {
+    while(1) {
         wrapped_key = NULL;
         wrapped_len = 0;
         rv = hsm_aes_encrypt(*session, wrapping_key_handle, aes_key, 16, &wrapped_key, &wrapped_len);
@@ -241,154 +241,6 @@ int encrypt_and_upload(CK_SESSION_HANDLE_PTR session, CK_OBJECT_HANDLE wrapping_
     return 0;
 }
 
-// int download_and_decrypt (  CK_SESSION_HANDLE_PTR session, 
-//                             //memcached_st *memc, 
-//                             //redisContext *conn,
-//                             char* ciphertext_id, 
-//                             CK_OBJECT_HANDLE wrapping_key_handle,
-//                             char** retrieved_message,
-//                             int* retrieved_message_length ) {
-
-//     //---------------------DECRYPTION---------------------------------
-//     ////////////////////////////////////////////////////////////////
-
-//     start = get_time_in_seconds();
-//     char wrap_text[] = "wrap_";
-//     char data_text[] = "data_";
-
-//     char* kv_key_wrap = malloc(strlen(wrap_text) + strlen(ciphertext_id)+1);
-//     char* kv_key_data = malloc(strlen(wrap_text) + strlen(ciphertext_id)+1);
-//     kv_key_wrap[0] = '\0';
-//     kv_key_data[0] = '\0';
-
-//     strcat(kv_key_wrap, wrap_text);
-//     strcat(kv_key_wrap, ciphertext_id);
-//     strcat(kv_key_data, data_text);
-//     strcat(kv_key_data, ciphertext_id);
-//     end = get_time_in_seconds();
-//     time_counter_decryption_storekey_namegen += end - start;
-
-//     // Open a Session to HSM
-//     CK_RV rv;
-//     int rc = EXIT_FAILURE;
-
-//     start = get_time_in_seconds();
-//     // /* New Redis Stuff */
-//     redisContext *conn = NULL;
-//     //int return_val = init_redis (&conn);
-//     int wrap_length;
-//     uint8_t* downloaded_wrap = get(kv_key_wrap, conn, &wrap_length);
-//     /* End New Redis Stuff */
-
-//     int retryforctxtlength = 0;
-//     while (wrap_length <= 0 && retryforctxtlength < 10) {
-//         retryforctxtlength++; 
-//         downloaded_wrap = get(kv_key_wrap, conn, &wrap_length);
-//     }
-//     if (wrap_length <= 0) {
-       
-//     	printf("Attempting to get %s\n", kv_key_wrap);
-//     	printf("ERROR: Wrap Length is %d\n", wrap_length);
-//         free(downloaded_wrap);
-//         free(kv_key_wrap);
-//         free(kv_key_data);
-//         return rc;
-//     }
-
-//     //close_redis (conn);
-//     //return_val = init_redis (&conn);
-
-//     /* New Redis Stuff */
-//     int ciphertext_length;
-//     uint8_t* downloaded_ciphertext = get(kv_key_data, conn, &ciphertext_length);
-//     //close_redis (conn);
-
-
-//     /* End New Redis Stuff */
-//     end = get_time_in_seconds();
-//     time_counter_decryption_retrieve_ciphertext += end - start;
-
-//     // if (strncmp(kv_key_wrap, "wrap_mmbaaaaaaa", 15)) {
-//     //     printf("LENGTH OF mmbaaaaaaa: %d\n", wrap_length);
-//     //     printf("LENGTH OF mmbaaaaaaa: %d\n", ciphertext_length);
-//     // }
-//     retryforctxtlength = 0;
-//     while (ciphertext_length <= 0 && retryforctxtlength < 10) {
-//         retryforctxtlength++; 
-//         downloaded_ciphertext = get(kv_key_data, conn, &ciphertext_length);
-//     }
-    
-    
-//     if (ciphertext_length <= 0) {
-// 	   printf("Attempting to get %s\n", kv_key_data);
-//         printf("ERROR: Ciphertext Length is %d\n", ciphertext_length);
-//         free(downloaded_wrap);
-//         free(kv_key_wrap);
-//         free(kv_key_data);
-//         free(downloaded_ciphertext);
-//         return rc;
-//     }
-    
-//     start = get_time_in_seconds();
-//     // Decrypt wrap with master key
-//     CK_BYTE_PTR decryption_key = NULL;
-//     CK_ULONG decryption_key_length = 0;
-
-//     double failstart = get_time_in_seconds();
-//     double failcont;
-
-//     int fail_counter = 0;
-
-//     while(true) {
-//         rv = hsm_aes_decrypt(*session, wrapping_key_handle, downloaded_wrap, wrap_length, &decryption_key, &decryption_key_length);
-//         if (rv == 7) {
-//             reset_connection(session);
-//             continue;
-//         } else if (rv == CKR_OK) {
-//             break;
-//         } else {
-//             printf("HSM_AES_DECRYPT ERROR\n");
-//         }
-//         fail_counter += 1;
-//         sleep(1);
-//         failcont = get_time_in_seconds();
-//         time_counter_decryption_fail_time += failcont - failstart;
-//         failstart = failcont;
-//     }
-
-//     //rv = hsm_aes_decrypt(session, wrapping_key_handle, downloaded_wrap, wrap_length, &decryption_key, &decryption_key_length);
-//     // if (rv != CKR_OK) {
-//     //     printf("%s\n", kv_key_wrap);
-//     //     printf("HSM_AES_DECRYPT ERROR\n");
-//     // }
-//     end = get_time_in_seconds();
-//     time_counter_decryption_decrypt_wrap += end - start;
-    
-//     start = get_time_in_seconds();
-//     // Decrypt Ciphertext with Decryption Key
-//     AE_ctx_header * downloaded_ctxt = (AE_ctx_header * ) downloaded_ciphertext;
-//     uint8_t * decrypted_message = (uint8_t * ) malloc(ciphertext_length-32);
-//     int decrypted_message_length = gcm_decrypt((uint8_t * )(downloaded_ciphertext+sizeof(AE_ctx_header)), ciphertext_length-32, (uint8_t * )(downloaded_ctxt->tag), decryption_key, (uint8_t * )(downloaded_ctxt->iv), IV_LEN, decrypted_message);
-//     end = get_time_in_seconds();
-//     time_counter_decryption_decrypt_ciphertext += end - start;
-
-
-//     // Print Out Decrypted Message
-//     // if (decrypted_message_length > 0) {
-//     //     printf("Decrypted Message Length: %d\n", decrypted_message_length);
-//     //     printf("Decrypted Message: %.*s\n", decrypted_message_length, (char*)decrypted_message);
-//     // }
-
-//     *retrieved_message = decrypted_message;
-//     *retrieved_message_length = decrypted_message_length;
-//     free(downloaded_wrap);
-//     free(kv_key_wrap);
-//     free(kv_key_data);
-//     free(downloaded_ciphertext);
-//     free(decryption_key);
-
-//     return 0;
-// }
 
 int download_and_decrypt (  CK_SESSION_HANDLE_PTR session, 
                             char* ciphertext_id, 
@@ -505,7 +357,7 @@ int download_and_decrypt (  CK_SESSION_HANDLE_PTR session,
 
     int fail_counter = 0;
 
-    while(true) {
+    while(1) {
         rv = hsm_aes_decrypt(*session, wrapping_key_handle, downloaded_wrap, wrap_length, &decryption_key, &decryption_key_length);
         if (rv == 7) {
             reset_connection(session);
@@ -664,7 +516,7 @@ int update_master_key ( CK_SESSION_HANDLE_PTR session,
         double failcont = 0.0;
         double failstart = start;
         int fail_counter = 0;
-        while(true) {
+        while(1) {
             rv = hsm_aes_decrypt(*session, old_key_handle, downloaded_wrap, wrap_length, &decryption_key, &decryption_key_length);
             if (rv == CKR_OK) {
                 break;
@@ -688,7 +540,7 @@ int update_master_key ( CK_SESSION_HANDLE_PTR session,
         CK_BYTE_PTR wrapped_key;
         CK_ULONG wrapped_len;
         fail_counter = 0;
-        while(true) {
+        while(1) {
             wrapped_key = NULL;
             wrapped_len = 0;
             rv = hsm_aes_encrypt(*session, *new_wrapping_key, decryption_key, decryption_key_length, &wrapped_key, &wrapped_len);
@@ -833,7 +685,7 @@ int updatable_encrypt_and_upload(CK_SESSION_HANDLE_PTR session,
     CK_BYTE_PTR wrapped_key = NULL;
     CK_ULONG wrapped_len = 0;
     int fail_counter = 0;
-    while(true) {
+    while(1) {
         wrapped_key = NULL;
         wrapped_len = 0;
         rv = hsm_aes_encrypt(*session, wrapping_key_handle, &ae_key, sizeof(AE_key), &wrapped_key, &wrapped_len);
@@ -952,7 +804,7 @@ int updatable_download_and_decrypt( CK_SESSION_HANDLE_PTR session,
 
     int fail_counter = 0;
 
-    while(true) {
+    while(1) {
 
         //printf("Wrapping Key Handle: %d\n", wrapping_key_handle);
         //printf("Wrapped Key: %s\n", ae_key_wrap);
@@ -1066,7 +918,7 @@ int updatable_update_dek_and_ciphertext(CK_SESSION_HANDLE_PTR session, CK_OBJECT
     double failcont;
 
     int fail_counter = 0;
-    while(true) {
+    while(1) {
         rv = hsm_aes_decrypt(*session, wrapping_key_handle, ae_key_wrap, wrap_length, &decryption_key, &decryption_key_length);
         if (rv == 7) {
             reset_connection(session);
@@ -1102,7 +954,7 @@ int updatable_update_dek_and_ciphertext(CK_SESSION_HANDLE_PTR session, CK_OBJECT
     CK_BYTE_PTR wrapped_key2 = NULL;
     CK_ULONG wrapped_len2 = 0;
     fail_counter = 0;
-    while(true) {
+    while(1) {
         wrapped_key2 = NULL;
         wrapped_len2 = 0;
         rv = hsm_aes_encrypt(*session, wrapping_key_handle, &ae_key2, sizeof(AE_key), &wrapped_key2, &wrapped_len2);
@@ -1166,5 +1018,4 @@ int updatable_update_dek_and_ciphertext(CK_SESSION_HANDLE_PTR session, CK_OBJECT
     free (wrapped_key2);
     free (decryption_key);
 }
-
 
