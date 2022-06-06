@@ -5,11 +5,8 @@ import time
 import datetime
 import json
 
-# Old Redis Instance ID
-#instance_ids = ["i-0825f06845e5b5491", "i-00c678d55268f6ac1"]
-
-# New KeyDB Instance ID
-instance_ids = ["i-09d27e41a8e88eb9c"]
+# Database Instance IDs
+instance_ids = ["<< Your Database IDS >>"]
 
 if len(sys.argv) < 2:
     print("Need to have log_file name as parameter")

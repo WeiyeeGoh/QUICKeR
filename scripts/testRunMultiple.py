@@ -5,8 +5,8 @@ import time
 import datetime
 
 
-client_machines = "benchmark4"
-update_machines = "benchmark2"
+client_machines = "routine_operations"
+update_machines = "ciphertext_updates"
 
 #experiment_numbers = [[4,0]]
 experiment_numbers = [[8,0], [8,2], [8,4], [8,8], [8,16],[8,24]]

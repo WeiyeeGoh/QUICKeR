@@ -11,7 +11,7 @@ def setup_local_task(cmd):
   print(out)
 
 def setup_experiment():
-  cmd = "cd ..;rm -r build; mkdir build; cd build; cmake .. -DHSM_USER=bob -DHSM_PASSWORD=Applejack2022 -DTRUSTED_WRAPPING_KEY_HANDLE=7;make; cd .."
+  cmd = "cd ..;rm -r build; mkdir build; cd build; cmake ..; make; cd .."
 
   print(cmd)
   setup_local_task(cmd)

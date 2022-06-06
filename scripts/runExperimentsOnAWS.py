@@ -13,7 +13,7 @@ import os
 
 # NEW KEYDB MACHINE
 argument_files = ["172.31.7.183\nbob:Applejack2022\n"] 
-
+private_key_pem = "<<YOUR_PRIVATE_KEY_PEM_FILENAME>>"
 
 activated_client_indexes = None
 
@@ -42,7 +42,7 @@ print(all_ip_addresses)
 # Set up the command_list
 output_logname = ""
 if sys.argv[1] == "pull":
-    cmd = "cd workspace3/UpdatableEncryptionResearchProject; git reset --hard HEAD; git checkout simpleserver; git reset --hard HEAD; git pull origin simpleserver"
+    cmd = "cd QUICKeR; git reset --hard HEAD; git checkout main; git reset --hard HEAD; git pull origin main"
     command_list = [cmd] * len(all_ip_addresses)
 elif sys.argv[1] == "run":
     date = datetime.datetime.now()
@@ -64,7 +64,7 @@ elif sys.argv[1] == "run":
             exit(0)
         for j in range (len(argument_files)):
             for k in range (portnum,  int(test_count / len(argument_files)) + portnum):
-                cmd = " cd workspace3/UpdatableEncryptionResearchProject/scripts;"
+                cmd = " cd QUICKeR/scripts;"
                 cmd += " echo $'" + argument_files[j] + str(k) +  "' > arguments.txt; "
                 cmd += " python3 run_client.py " + test_name + " " + logname
             
@@ -79,7 +79,7 @@ elif sys.argv[1] == "setup":
         print("Error: Need HSM ip address")
         exit(0)
 
-    cmd = "cd workspace3/UpdatableEncryptionResearchProject/scripts; python3 setup_client.py " + sys.argv[2]
+    cmd = "cd QUICKeR/scripts; python3 setup_client.py " + sys.argv[2]
     command_list = [cmd] * len(all_ip_addresses)
 
 elif sys.argv[1] == "aggregate":
@@ -94,7 +94,7 @@ elif sys.argv[1] == "aggregate":
         test_name = line_split[0]
         test_count = int(line_split[1])
 
-        cmd = "cd workspace3/UpdatableEncryptionResearchProject/scripts; cat arguments.txt; cat " + sys.argv[2] + ".txt"
+        cmd = "cd QUICKeR/scripts; cat arguments.txt; cat " + sys.argv[2] + ".txt"
         command_list += [(test_name, cmd)] * test_count
     f.close()
 else:
@@ -118,7 +118,7 @@ print(command_list)
 def call_to_instance(ip_address, command, test_name=None):
     print("connecting to %s" %(ip_address))
 
-    key = paramiko.RSAKey.from_private_key_file("./lawrence-ucsb-test-1.pem")
+    key = paramiko.RSAKey.from_private_key_file(private_key_pem)
     client = paramiko.SSHClient()
     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 

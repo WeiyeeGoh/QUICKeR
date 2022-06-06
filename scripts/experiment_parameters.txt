@@ -1,2 +1,2 @@
-benchmark4 14
-benchmark2 24
+ciphertext_updates_naive 14
+routine_operations_naive 24

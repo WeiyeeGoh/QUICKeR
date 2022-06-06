@@ -6,12 +6,12 @@ import datetime
 
 
 logs = [
-"logs/22-05-16-06:52:48_logs"
+"log_filename"
 ]
 
 
-client_machines = "updatable_enc_benchmark"
-update_machines = "updatable_benchmark"
+client_machines = "routine_operations"
+update_machines = "ciphertext_updates"
 
 # " echo $'" + experimentList[0] + "' > arguments.txt; "
 
