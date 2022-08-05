@@ -12,6 +12,17 @@
 double store_time = 0.0;
 double retrieve_time = 0.0;
 
+
+int update_ip_addr (char* newip_addr) {
+	ip_addr = newip_addr;
+}
+
+
+int update_portnum (int new_portnum) {
+	portnum = new_portnum;
+}
+
+
 char *base64_enc(const char *str, int len)
 {
 	BIO *bio, *b64;

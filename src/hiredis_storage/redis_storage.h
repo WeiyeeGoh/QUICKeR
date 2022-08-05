@@ -12,6 +12,10 @@ int portnum;
 
 char buff[MAX];
 
+int update_ip_addr (char* newip_addr);
+int update_portnum (int portnum);
+
+
 int recvall (int sockfd, void* recvbuf, int buffsize);
 int sendall (int sockfd, void* sendbuf, int sendsize);
 int get_sockfd ();

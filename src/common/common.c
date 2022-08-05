@@ -247,4 +247,74 @@ char** split_by_space (char *str, int* count) {
 }
 
 
+char** split_by_char (char *str, int* count, char val) {
+
+        int length = strlen(str);
+        char* token;
+
+        char* copy = malloc (length + 1);
+        memset (copy, 0, length + 1);
+        memcpy (copy, str, length);
+        char* rest = copy;
+        (*count) = 0;
+        while ((token = strtok_r(rest, val + "", &rest))) {
+                (*count)++;
+        }
+
+        char** string_arr = malloc(*count * sizeof(char*));
+        memset(copy, 0, length+1);
+        strncpy(copy, str, length);
+        rest = copy;
+        int index = 0;
+        while ((token = strtok_r(rest, val + "", &rest))) {
+                string_arr[index] = token;
+                index ++;
+        }
+
+        return string_arr;
+}
+
+struct key_to_db * parse_key_file (char* filename, int* numkeys){
+		
+	size_t len = 0;
+   	ssize_t read;
+	char *line = NULL;
+    	FILE *fp;
+    	fp = fopen(filename, "r");
+	
+	
+	int count = 0;
+
+    	while ((read = getline(&line, &len, fp)) != -1) {
+		count ++;
+	}
+	free(line);
+	(*numkeys) = count;
+
+	close (fp);
+
+	struct key_to_db * ret = malloc (sizeof (struct key_to_db) * (count));
+
+	FILE *fp2;
+	fp = fopen (filename, "r");
+	int j = 0;
+    	while ((read = getline(&line, &len, fp)) != -1) {
+		int i = 0;
+    		char ** key_and_db = split_by_space (line, &i);
+		if (i == 2) {
+			ret[j].key = key_and_db[0];
+			ret[j].db_ip_addr = key_and_db[1];
+		}
+		j++;
+	}
+	free(line);
+	close (fp2);
+	return ret;
+}
+
+struct key_to_db get_random_key (struct key_to_db* map, int size) {
+	int index = rand() % size;
+	return map[index];
+}
+
 

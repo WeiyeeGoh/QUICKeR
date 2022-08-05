@@ -51,6 +51,12 @@ struct parameters {
     struct redis_arguments redis_parameters;
 };
 
+struct key_to_db {
+    char * key;
+    char * db_ip_addr;
+};
+
+
 int init_params (const char* filename, struct parameters* args);
 
 int get_pkcs_args(int argc, char **argv, struct pkcs_arguments *args);
