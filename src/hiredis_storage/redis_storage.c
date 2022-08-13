@@ -45,7 +45,8 @@ char *base64_enc(const char *str, int len)
 	BIO_flush(b64);
 	BIO_get_mem_ptr(b64, &bptr);
 
-	buf = malloc(bptr->length + 1);
+	buf = malloc(sizeof(char*) * ((bptr->length) + 100));
+
 	if (buf) {
 		memcpy(buf, bptr->data, bptr->length+1);
 		buf[bptr->length] = 0;
@@ -214,6 +215,46 @@ int close_redis (redisContext *conn) {
 
 
 	close(sockfd);
+	return 0;
+}
+
+int savedata(char *value, redisContext *conn) {
+	init_redis (conn);
+
+	int size = 9 + strlen (value) + 1;
+
+	buff[0] = 0;
+	strncat (buff, "SAVEDATA ", 9);
+	strncat (buff, value, strlen(value));
+
+	buff[size] = 0;
+
+
+	sendall(sockfd, buff, size);
+
+	recvall(sockfd, buff, MAX);
+
+	close (sockfd);
+	return 0;
+}
+
+int populate(char *value, redisContext *conn) {
+	init_redis (conn);
+
+	int size = 9 + strlen (value) + 1;
+
+	buff[0] = 0;
+	strncat (buff, "POPULATE ", 9);
+	strncat (buff, value, strlen(value));
+
+	buff[size] = 0;
+
+
+	sendall(sockfd, buff, size);
+
+	recvall(sockfd, buff, MAX);
+
+	close (sockfd);
 	return 0;
 }
 

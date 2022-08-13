@@ -16,7 +16,8 @@ int num_forks = 0;
 const int num_keys = 1;
 CK_OBJECT_HANDLE key_handle_arr [1];
 CK_OBJECT_HANDLE key_handle;
-int db_keys_per_server = 2;             // number of keys per server?
+// number of keys per server?
+int db_keys_per_server = 10000;
 int key_size = 5;
 char** database_keys;
 
@@ -93,7 +94,7 @@ int main (int argc, char** argv) {
 
 
     // Benchmark Numbers
-    reuse_message_size = 100000;       // 10 KB
+    reuse_message_size = 1000000;       // 10 KB
     reuse_message = malloc(reuse_message_size);
     memset(reuse_message, 'a', reuse_message_size);
 
@@ -168,12 +169,61 @@ int main (int argc, char** argv) {
     database_keys = (char**) malloc(sizeof(char*) * (num_of_db_keys));
     memset(database_keys, 0, sizeof(char*) * (num_of_db_keys));
 
+    // Generate ciphertexts for all keys    
+    // Encrypt Data using Updatable Encryption
+    AE_key ae_key;
+    AE_KeyGen( & ae_key, 64);
+
+    ct_hat_data_en ciphertext_hat;
+    int buffer_length = sizeof(AE_ctx_header) + reuse_message_size + 64 * (2 * RHO + NU);
+    uint8_t * ciphertext = (uint8_t * ) malloc(buffer_length);
+
+    int ctx_length = AE_Encrypt(&ae_key, reuse_message, &ciphertext_hat, ciphertext, reuse_message_size);
+
+
+    // Wrap the Decryption Key  
+    CK_BYTE_PTR wrapped_key = NULL;
+    CK_ULONG wrapped_len = 0;
+    int fail_counter = 0;
+    while(1) {
+        wrapped_key = NULL;
+        wrapped_len = 0;
+        rv = hsm_aes_encrypt(reuse_session, key_handle, &ae_key, sizeof(AE_key), &wrapped_key, &wrapped_len);
+        
+        if (rv == CKR_OK) {
+            break;
+        }
+        fail_counter += 1;
+        if (fail_counter > 10) {
+            break;
+        }
+        sleep(1);
+    }
+
+    if (rv != CKR_OK) {
+        printf("HSM Aes Encrypt Failed\n");
+        exit(1);
+    }
+
+
+    char* b64_ciphertext = (char*) base64_enc((char*) ciphertext, ctx_length);
+    char* b64_ciphertext_hat = base64_enc((char*) &ciphertext_hat, sizeof(ct_hat_data_en));
+    char* b64_wrapped_key = base64_enc((char*) wrapped_key, wrapped_len);
+
+    int key_type_count = 5;
+    char** key_type_values = malloc(sizeof(char*) * key_type_count);
+    key_type_values[0] = b64_ciphertext;
+    key_type_values[1] = b64_wrapped_key;
+    key_type_values[2] = b64_ciphertext_hat;
+    key_type_values[3] = "0";
+    char key_handle_string[15];
+    sprintf(key_handle_string, "%d", key_handle);
+    key_type_values[4] = key_handle_string;
 
 
 
     // Generate num_of_db_keys (just the key name) number of keys into our database_keys datastructure
     for (int i=0; i < num_of_db_keys; i++) {
-
         database_keys[i] = (char * ) malloc(sizeof(char) * (key_size));
         memset(database_keys[i], 0, sizeof(char) * (key_size));
 
@@ -184,19 +234,60 @@ int main (int argc, char** argv) {
         database_keys[i][key_size] = '\0';
     }
 
+
     // Setup Database with num_of_db_keys number of keys and encrypted messages (and write to file)
 
+    char wrap_text[] = "wrap_";
+    char header_text[] = "header_";
+    char data_text[] = "data_";
+    char ctxt_version_number[] = "ctxt_version_";
+    char root_key_version_number[] = "root_version_";
+    char** key_prefix_list = malloc(sizeof(char*) * key_type_count);
+    key_prefix_list[0] = wrap_text;
+    key_prefix_list[1] = header_text;
+    key_prefix_list[2] = data_text;
+    key_prefix_list[3] = ctxt_version_number;
+    key_prefix_list[4] = root_key_version_number;
+
+
+    char listbuf[1000000];
+
+
+    // Generate list of keys for each database
+    for (int i = 0; i < server_count; i++) {
+        for (int k=0; k < key_type_count; k++) {
+
+
+            listbuf[0] = '\0';
+            for (int j = i; j < num_of_db_keys; j+=server_count) {
+                strcat(listbuf, key_prefix_list[k]);
+                strcat(listbuf, database_keys[j]);
+                if (j + server_count < num_of_db_keys) {
+                    strcat(listbuf, " ");
+                }
+            }
+
+            update_ip_addr(server_ip_addr_list[i]);
+
+            //printf("SAVE DATA\n");
+            // Send SAVEDATA to redis (technically simpleserver)
+            redisContext *conn = NULL;
+            savedata(key_type_values[k], conn);
+
+            //printf("POPULATE DATA\n");
+            // Send POPULTATE to redis
+            conn = NULL;
+            populate(listbuf, conn);
+        }
+    }
+
+    // write to file the location of each key
     FILE *fp;
     fp = fopen("Output.txt", "w");
 
     for (int i = 0; i < num_of_db_keys; i++) {
-
         ip_addr = server_ip_addr_list[i % server_count];
-        //database_key_ip_address[i] = server_ip_addr_list[i % server_count];
-        rv = updatable_encrypt_and_upload(&reuse_session, key_handle, database_keys[i], reuse_message, reuse_message_size, 64);
-
         fprintf(fp, "%s %s\n", database_keys[i], ip_addr);
-
     } 
 
     fclose(fp);
@@ -204,3 +295,5 @@ int main (int argc, char** argv) {
     pkcs11_finalize_session(reuse_session);
 
 }
+
+
