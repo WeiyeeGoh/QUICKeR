@@ -1,0 +1,2 @@
+/usr/bin/ar qc libactions.a  CMakeFiles/actions.dir/actions.c.o
+/usr/bin/ranlib libactions.a

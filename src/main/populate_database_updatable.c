@@ -212,14 +212,13 @@ int main (int argc, char** argv) {
 
     int key_type_count = 5;
     char** key_type_values = malloc(sizeof(char*) * key_type_count);
-    key_type_values[0] = b64_ciphertext;
-    key_type_values[1] = b64_wrapped_key;
-    key_type_values[2] = b64_ciphertext_hat;
-    key_type_values[3] = "0";
     char key_handle_string[15];
     sprintf(key_handle_string, "%d", key_handle);
-    key_type_values[4] = key_handle_string;
-
+    key_type_values[0] = key_handle_string;
+    key_type_values[1] = "0";
+    key_type_values[2] = b64_wrapped_key;
+    key_type_values[3] = b64_ciphertext_hat;
+    key_type_values[4] = b64_ciphertext;
 
 
     // Generate num_of_db_keys (just the key name) number of keys into our database_keys datastructure
@@ -243,11 +242,12 @@ int main (int argc, char** argv) {
     char ctxt_version_number[] = "ctxt_version_";
     char root_key_version_number[] = "root_version_";
     char** key_prefix_list = malloc(sizeof(char*) * key_type_count);
-    key_prefix_list[0] = wrap_text;
-    key_prefix_list[1] = header_text;
-    key_prefix_list[2] = data_text;
-    key_prefix_list[3] = ctxt_version_number;
-    key_prefix_list[4] = root_key_version_number;
+
+    key_prefix_list[0] = root_key_version_number;
+    key_prefix_list[1] = ctxt_version_number;
+    key_prefix_list[2] = wrap_text;
+    key_prefix_list[3] = header_text;
+    key_prefix_list[4] = data_text;
 
 
     char listbuf[1000000];

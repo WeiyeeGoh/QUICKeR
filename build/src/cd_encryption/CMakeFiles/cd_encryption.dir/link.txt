@@ -1,0 +1,2 @@
+/usr/bin/ar qc libcd_encryption.a  CMakeFiles/cd_encryption.dir/AE_Nested_AES.c.o CMakeFiles/cd_encryption.dir/aes_gcm.c.o CMakeFiles/cd_encryption.dir/aes_ctr.c.o
+/usr/bin/ranlib libcd_encryption.a

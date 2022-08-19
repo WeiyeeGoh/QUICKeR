@@ -1,0 +1,2 @@
+/usr/bin/ar qc libhiredis_storage.a  CMakeFiles/hiredis_storage.dir/redis_storage.c.o
+/usr/bin/ranlib libhiredis_storage.a

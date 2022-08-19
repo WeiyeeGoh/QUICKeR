@@ -734,30 +734,42 @@ int updatable_encrypt_and_upload(CK_SESSION_HANDLE_PTR session,
     return 0;
 }
 
+
+
+//  WORKING HERE
+//  asdlfkads
 int updatable_download_and_decrypt( CK_SESSION_HANDLE_PTR session, 
 				    CK_OBJECT_HANDLE wrapping_key_handle,		    
 				    char* ciphertext_id, 
                                     char** retrieved_message,
                                     int* retrieved_message_length ) {
+    // CK_OBJECT_HANDLE wrapping_key_handle will be deprecated
 
 
     // Setup Keys to Lookup Values on Redis Store
     char wrap_text[] = "wrap_";
     char header_text[] = "header_";
     char data_text[] = "data_";
+    //char ctxt_version_number[] = "ctxt_version_";
+    char root_key_version_number[] = "root_version_";
 
     char* kv_key_wrap = malloc(strlen(wrap_text) + strlen(ciphertext_id)+1);
     char* kv_key_header = malloc(strlen(header_text) + strlen(ciphertext_id)+1);
     char* kv_key_data = malloc(strlen(data_text) + strlen(ciphertext_id)+1);
+    char* kv_key_rkvn = malloc(strlen(root_key_version_number) + strlen(ciphertext_id)+1);
+
     kv_key_wrap[0] = '\0';
     kv_key_header[0] = '\0';
     kv_key_data[0] = '\0';
+    kv_key_rkvn[0] = '\0';
 
     strcat(kv_key_wrap, wrap_text);
     strcat(kv_key_wrap, ciphertext_id);
     strcat(kv_key_header, header_text);
     strcat(kv_key_header, ciphertext_id);
     strcat(kv_key_data, data_text);
+    strcat(kv_key_data, ciphertext_id);
+    strcat(kv_key_data, root_key_version_number);
     strcat(kv_key_data, ciphertext_id);
 
     //setup redis connection
@@ -773,12 +785,13 @@ int updatable_download_and_decrypt( CK_SESSION_HANDLE_PTR session,
     // uint8_t * ciphertext = (uint8_t *) get(kv_key_data, conn, &data_length);
 
 
-    char* kv_key[3];
+    char* kv_key[4];
     kv_key[0] = kv_key_wrap;
     kv_key[1] = kv_key_header;
     kv_key[2] = kv_key_data;
+    kv_key[3] = kv_key_rkvn;
     int* sizes;
-    char** downloaded_values = getall(3, kv_key, &sizes, conn);
+    char** downloaded_values = getall(4, kv_key, &sizes, conn);
     int wrap_length = sizes[0];
     char* ae_key_wrap = downloaded_values[0];
     int header_length = sizes[1];
@@ -852,6 +865,7 @@ int updatable_download_and_decrypt( CK_SESSION_HANDLE_PTR session,
     free(kv_key_wrap);
     free(kv_key_header);
     free(kv_key_data);
+    free(kv_key_rkvn);
     free(decryption_key);
 
     return 0;

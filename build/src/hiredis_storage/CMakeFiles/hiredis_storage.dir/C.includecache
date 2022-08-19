@@ -1,0 +1,34 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/ec2-user/QUICKeR/src/hiredis_storage/redis_storage.c
+hiredis/hiredis.h
+-
+stdio.h
+-
+string.h
+-
+redis_storage.h
+/home/ec2-user/QUICKeR/src/hiredis_storage/redis_storage.h
+openssl/bio.h
+-
+openssl/evp.h
+-
+openssl/buffer.h
+-
+stdlib.h
+-
+sys/socket.h
+-
+netdb.h
+-
+
+/home/ec2-user/QUICKeR/src/hiredis_storage/redis_storage.h
+hiredis/hiredis.h
+-
+
