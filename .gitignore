@@ -1,3 +1,4 @@
 build
 *.pem
 *logs.txt
+scripts/logs/*logs/
