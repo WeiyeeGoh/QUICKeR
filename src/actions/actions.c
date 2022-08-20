@@ -769,8 +769,8 @@ int updatable_download_and_decrypt( CK_SESSION_HANDLE_PTR session,
     strcat(kv_key_header, ciphertext_id);
     strcat(kv_key_data, data_text);
     strcat(kv_key_data, ciphertext_id);
-    strcat(kv_key_data, root_key_version_number);
-    strcat(kv_key_data, ciphertext_id);
+    strcat(kv_key_rkvn, root_key_version_number);
+    strcat(kv_key_rkvn, ciphertext_id);
 
     //setup redis connection
     redisContext *conn = NULL;
@@ -831,6 +831,8 @@ int updatable_download_and_decrypt( CK_SESSION_HANDLE_PTR session,
         } else {
             printf("HSM_AES_DECRYPT ERROR\n");
         }
+        printf("Wrap Length: %d\n", wrap_length);
+        printf("Decryption Key Length: %d\n", decryption_key_length);
         fail_counter += 1;
         sleep(1);
         failcont = get_time_in_seconds();
@@ -846,16 +848,19 @@ int updatable_download_and_decrypt( CK_SESSION_HANDLE_PTR session,
     // Close Redis Connection
     //close_redis (conn);
 
+
     // AE_Decrypt
     uint8_t * decrypted_message = (uint8_t * ) malloc(data_length);
+    //bzero(decrypted_message, data_length);
     AE_Decrypt(ae_key, ciphertext_hat, ciphertext, decrypted_message, data_length - 32);
 
 
-
-    *retrieved_message_length = strlen(decrypted_message);
+    // this retrieved_message_length is currently incorrect
+    *retrieved_message_length = strlen(decrypted_message) + 1; // +1 because null terminator
     *retrieved_message = malloc( *retrieved_message_length);
     memset(*retrieved_message, 0, *retrieved_message_length);
     strncpy(*retrieved_message, decrypted_message, *retrieved_message_length);
+    printf("retrieved_message_length: %d\n", *retrieved_message_length);
 
 
     free(decrypted_message);

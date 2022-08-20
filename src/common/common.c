@@ -48,8 +48,10 @@ int init_params (const char* filename, struct parameters* args) {
     char* library = "/opt/cloudhsm/lib/libcloudhsm_pkcs11.so";
 
     fp = fopen(filename, "r");
-    if (fp == NULL)
+    if (fp == NULL) {
+        printf("EXIT FAILURE\n");
         exit(EXIT_FAILURE);
+    }
 
     // line 1 is ip address of redis
     // line 2 is port num

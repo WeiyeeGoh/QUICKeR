@@ -17,7 +17,7 @@ const int num_keys = 1;
 CK_OBJECT_HANDLE key_handle_arr [1];
 CK_OBJECT_HANDLE key_handle;
 // number of keys per server?
-int db_keys_per_server = 10000;
+int db_keys_per_server = 10;
 int key_size = 5;
 char** database_keys;
 
@@ -93,10 +93,15 @@ char* get_ip_address()
 int main (int argc, char** argv) {
 
 
+    double start_time = get_time_in_seconds();
+
+
     // Benchmark Numbers
-    reuse_message_size = 1000000;       // 10 KB
+    reuse_message_size = 100000;       // 10 KB
     reuse_message = malloc(reuse_message_size);
     memset(reuse_message, 'a', reuse_message_size);
+    reuse_message[reuse_message_size-1] = '\0';
+    //printf("%d\n", strlen(reuse_message));
 
     CK_RV rv;
     int rc = EXIT_FAILURE;
@@ -108,11 +113,12 @@ int main (int argc, char** argv) {
     portnum = param.redis_parameters.portnum; // keep as is
 
 
-    // Get list of ip_addresses
-    char** server_ip_addr_list;
-    char* server_ip_addr_string_list = param.redis_parameters.ip_addr;
-    int server_count;
-    server_ip_addr_list = split_by_comma(server_ip_addr_string_list, &server_count);
+    // Get list of ip_addresses (HARDCODED NOW)
+    char* server_ip_addr_list[] = {"172.31.8.137"};
+    int server_count = sizeof(server_ip_addr_list) / sizeof(server_ip_addr_list[0]);
+    // char* server_ip_addr_string_list = param.redis_parameters.ip_addr;
+    // int server_count;
+    // server_ip_addr_list = split_by_comma(server_ip_addr_string_list, &server_count);
 
 
     int initcount = 0;
@@ -220,6 +226,16 @@ int main (int argc, char** argv) {
     key_type_values[3] = b64_ciphertext_hat;
     key_type_values[4] = b64_ciphertext;
 
+    printf("ctx_length: %d\n", ctx_length);
+    int result_length_2;
+    char* b64_dec_wrapped_key = base64_dec(b64_ciphertext, strlen(b64_ciphertext), &result_length_2);
+    printf("result_length_2: %d\n", result_length_2);
+
+
+    printf("b64_wrapped_key: %s\n", b64_wrapped_key);
+    printf("b64_ciphertext_hat: %s\n", b64_ciphertext_hat);
+    printf("strlen of b64_ciphertext: %d\n", strlen(b64_ciphertext));
+
 
     // Generate num_of_db_keys (just the key name) number of keys into our database_keys datastructure
     for (int i=0; i < num_of_db_keys; i++) {
@@ -254,10 +270,11 @@ int main (int argc, char** argv) {
 
 
     // Generate list of keys for each database
+
     for (int i = 0; i < server_count; i++) {
+        printf("Sending to server %d\n", i);
+
         for (int k=0; k < key_type_count; k++) {
-
-
             listbuf[0] = '\0';
             for (int j = i; j < num_of_db_keys; j+=server_count) {
                 strcat(listbuf, key_prefix_list[k]);
@@ -267,19 +284,31 @@ int main (int argc, char** argv) {
                 }
             }
 
+            printf("Updating IP Addr to %d\n", server_ip_addr_list[i]);
             update_ip_addr(server_ip_addr_list[i]);
 
+
+
+            printf("Performing Save Data On Key %d\n", k);
             //printf("SAVE DATA\n");
             // Send SAVEDATA to redis (technically simpleserver)
             redisContext *conn = NULL;
             savedata(key_type_values[k], conn);
 
+
+
+            printf("Performing Populate Data On Key %d\n", k);
             //printf("POPULATE DATA\n");
             // Send POPULTATE to redis
             conn = NULL;
             populate(listbuf, conn);
         }
     }
+
+
+    double end_time = get_time_in_seconds();
+    printf("Took %f Seconds to Populate %d keys on %d servers. DB should show %d keys including keys for the metadata\n", (end_time - start_time), db_keys_per_server, server_count, num_of_db_keys * 5);
+
 
     // write to file the location of each key
     FILE *fp;

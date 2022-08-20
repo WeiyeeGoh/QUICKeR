@@ -341,6 +341,8 @@ char** getall (int numkeys, char** keys, int**sizes, redisContext *conn) {
 	*sizes = malloc(numkeys);
 	//printf("addr: %d\n", *sizes);
 
+	printf("strlen of data: %d\n", strlen(values[0]));
+
 	for (int i = 0; i < numkeys; i++) {
 		int result_length;
 		ret[i] = base64_dec(values[i], strlen(values[i]), &result_length);
@@ -354,6 +356,10 @@ char** getall (int numkeys, char** keys, int**sizes, redisContext *conn) {
 	}
 	free (values[0]);
 	free (values);
+
+	for (int i = 0; i < numkeys; i++) {
+		printf("size: %d\n", (*sizes)[i]);
+	}
 
 
 	close (sockfd);

@@ -108,6 +108,186 @@ void TimerSet (int interval) {
 }
 
 int main (int argc, char** argv) {
+
+    if (argc < 3) {
+        printf("Missing Output.txt. Try <../build/src/main/ciphertext_updates_updatable_encryption arguments.txt Output.txt\n");
+    } else if (argc < 2) {
+        printf("Missing arguments.txt. Try <../build/src/main/ciphertext_updates_updatable_encryption arguments.txt Output.txt\n");
+    }
+
+    CK_RV rv;
+    int rc = EXIT_FAILURE;
+    
+    struct parameters param = {0};
+    init_params(argv[1], &param);
+
+    args = param.pkcs_parameters;
+    //ip_addr = param.redis_parameters.ip_addr;
+    portnum = param.redis_parameters.portnum;
+
+    // Session Handler Stuff    
+    int initcount = 0;
+    rv = pkcs11_initialize(args.library);
+    while (CKR_OK != rv) {
+        rv = pkcs11_initialize(args.library);
+
+        if (initcount > 10) {
+            printf("FAILED: pkcs11_initialization\n");
+            return rc;
+        }
+
+        initcount += 1;
+    }
+
+    rv = pkcs11_open_session(args.pin, &reuse_session);
+    while (CKR_OK != rv) {
+        reuse_session = NULL;
+        rv = pkcs11_open_session(args.pin, &reuse_session);
+
+        if (initcount > 20) {
+            printf("FAILED: pkcs11_open_session\n");
+            return EXIT_FAILURE;
+        }
+
+        initcount += 1;
+        sleep(1);
+    }
+
+
+    // Read Output.txt and parse it into two arrays
+    FILE *fp;
+    fp = fopen(argv[2], "r");
+    if (fp == NULL) {
+        printf("EXIT FAILURE\n");
+        exit(EXIT_FAILURE);
+    }
+
+    // setup vars for reading each line
+    int read = 0;
+    char  *line = NULL;
+    int len = 0;
+    int entry_count = 0;
+
+    // count number of keys in db
+    while ( getline(&line, &len, fp) != -1) {
+        entry_count += 1;
+    }
+    printf("%d Keys in %s\n", entry_count, argv[2]);
+
+    // use number of keys to generate two arrays. (1) holds all the key names. (2) holds the server ip address
+    char** db_key_list = malloc(sizeof(char*) * entry_count);
+    char** db_key_ip_addr = malloc(sizeof(char*) * entry_count);
+
+    // seek back to the beginning of the file
+    fseek(fp, 0, SEEK_SET);
+
+    // Read from the file and add each entry to our two arrays
+    int total_keys = 0;
+    while ( getline(&line, &len, fp) != -1) {
+        printf("%s\n", line);
+
+        int split_count;
+        char** split_arr = split_by_space(line, &split_count);
+        if (split_count == 2) {
+            db_key_list[total_keys] = split_arr[0];
+            split_arr[1][strlen(split_arr[1])-1] = '\0';
+            db_key_ip_addr[total_keys] = split_arr[1];
+            printf("KEY: %s\n", split_arr[0]); 
+            printf("IP ADDR: %s\n", split_arr[1]);
+        }
+        total_keys += 1;
+    }
+
+    // for(int i=0; i < total_keys; i++) {
+    //     printf("KEY VALUE: %s\n", db_key_list[i]);
+    //     printf("IP ADDR  : %s\n", db_key_ip_addr[i]);
+    // }
+    fclose(fp);
+
+    printf("Done with keys\n");
+
+
+    // HardCode K_master key handle
+    //key_handle = key_handle_arr[0];
+    key_handle = 8126470;
+
+
+    // Update each of this instance's assigned keys
+    int starting_key_index = 0;
+    int num_of_assigned_keys = total_keys;
+
+    // If first line of arguments is filled, then we modify starting_key_index and num_of_assigned_keys. 
+
+
+
+    // Get value before we update it
+
+    double thisstart = get_time_in_seconds();
+    for (int i=0; i < num_of_assigned_keys; i++) {
+
+        printf("Doing Update %d on KEY %s\n", i, db_key_list[starting_key_index + i]);
+        
+        int db_key_index = total_messages % num_of_db_keys;
+        //int rv = update_dek_key ( &reuse_session, database_keys[db_key_index], key_handle);
+
+        printf("Updating IP Addr to %d\n", db_key_ip_addr[i]);
+        update_ip_addr(db_key_ip_addr[i]);
+
+
+        // Get value before we update it
+        char * received_before;
+        int length_before;
+
+        rv = updatable_download_and_decrypt(&reuse_session, key_handle, db_key_list[starting_key_index + i], &received_before, &length_before);
+
+        printf("after first dl\n");
+        
+        //printf ("Before update\n");  
+        //rv = updatable_update_dek_and_ciphertext(&reuse_session, key_handle, db_key_list[starting_key_index + i], num_reencrypts);
+        
+
+        printf("after first update\n");
+
+        // Test it works??
+        char * received_after;
+        int length_after;
+        rv = updatable_download_and_decrypt(&reuse_session, key_handle, db_key_list[starting_key_index + i], &received_after, &length_after);
+
+        printf("length_after: %d\n", length_after);
+        printf("length_before: %d\n", length_before);
+
+        if (strncmp (received_after, received_before, length_before) != 0) {
+           printf ("Error with decrypting into original message, not same.\n"    );
+        } else {
+           printf ("INFO Decryption AFTER UPDATE worked\n");
+        } 
+        free(received_after);
+        free(received_before);
+
+    
+
+           
+      
+        total_messages += 1;
+        if (total_messages % 100 == 0) {
+           printf ("Message # %d\n", total_messages);
+        }
+    }
+    double thisend = get_time_in_seconds();
+
+    printf ("Time passed:   %f\n", (thisend - thisstart));
+    printf ("Num rotations: %d\n", total_messages);
+    printf ("[LOG] latency_final: %f\n\n", (double)(thisend-thisstart) / (double) (total_messages)); 
+
+    pkcs11_finalize_session(reuse_session);
+
+
+}
+
+
+
+
+int amain (int argc, char** argv) {
     int count_forks = 0;
     int parent = 1;
     int pid = NULL;

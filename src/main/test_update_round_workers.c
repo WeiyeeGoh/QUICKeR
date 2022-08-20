@@ -34,6 +34,13 @@ double time_expired = 0;
 
 int num_reencrypts = 64;
 
+#define MAX 16000000 // = 10 MB
+//#define MAX 20000
+#define PORT 7654
+#define ARRAY_SIZE 20
+#define SA struct sockaddr
+
+
 
 // C program to display hostname
 // and IP address
@@ -48,9 +55,35 @@ int num_reencrypts = 64;
 #include <arpa/inet.h>
 
 
-int main() {
-    exit(0);
+
+
+int recvall (int sockfd, void* recvbuf, int buffsize) {
+    //bzero (recvbuf, buffsize);
+    int total_bytes = 0;
+    int nbytes = 0;
+
+    void* startbuf = recvbuf;
+
+
+    int index = 0;
+    //printf ("Before recv\n");
+    while (total_bytes < buffsize && (nbytes = recv(sockfd, startbuf, buffsize, 0)) > 0){
+        // From here, valid bytes are from recvbuf to recvbuf + nbytes.
+        // You could simply fwrite(fp, recvbuf, nbytes) or similar. 
+        //printf("-----iteration %d------", index);
+        startbuf += nbytes;
+        total_bytes += nbytes;
+        index += 1;
+            
+        if (((char*)recvbuf)[total_bytes-1] == '\0') {
+            break;
+        }
+    }
+    ((char*)recvbuf)[total_bytes +1] = 0;
+    //printf ("Received: %s\n", (char*)recvbuf);
+    return total_bytes;
 }
+
 
 int myThreadFun(int* t_num) {
     int thread_num = *(t_num);
@@ -72,7 +105,7 @@ int myThreadFun(int* t_num) {
     // assign IP, PORT
     servaddr.sin_family = AF_INET;
     servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
-    servaddr.sin_port = htons(PORT + thread_num);
+    servaddr.sin_port = htons(PORT);
 
     // Binding newly created socket to given IP and verification
     if ((bind(sockfd, (SA*)&servaddr, sizeof(servaddr))) != 0) {
@@ -82,21 +115,57 @@ int myThreadFun(int* t_num) {
     else {
         printf("Socket successfully binded..\n");
     }
+
+
+    // Now server is ready to listen and verification
+    if ((listen(sockfd, 5)) != 0) {
+        printf("Listen failed on port %d...\n", PORT);
+        exit(0);
+    }
+    else {
+        printf("Server listening on port %d..\n", PORT);
+    }
+    len = sizeof(cli);
+
+    char* buff = (char*)malloc (MAX);
+
+
+    for(;;) {
+
+        connfd = accept(sockfd, (SA*)&cli, &len);
+        if (connfd < 0) {
+            printf("server accept failed...\n");
+            //exit(0);
+        }
+        else {
+            //printf("server accept the client...\n");
+        }
+
+        recvall(connfd, buff, MAX);
+
+        // print
+        printf("buff: %s\n", buff);
+
+
+    }
 }
 
 // Driver function
 int main()
 {
-    int num_threads = 5;
 
 
-    for (int i = 0; i < num_threads; i++) {
+    // for (int i = 0; i < num_threads; i++) {
 
-        pthread_t thread_id;
-        int* thread_num = malloc(sizeof(int));
-        *thread_num = i;
-        pthread_create(&thread_id, NULL, myThreadFun, (void*) thread_num);
-    }
+    //     pthread_t thread_id;
+    //     int* thread_num = malloc(sizeof(int));
+    //     *thread_num = i;
+    //     pthread_create(&thread_id, NULL, myThreadFun, (void*) thread_num);
+    // }
+
+    pthread_t thread_id;
+    int thread_num = 1;
+    pthread_create(&thread_id, NULL, myThreadFun, (void*) &thread_num);
 
     // Accept the data packet from client and verification
     for(;;) {
