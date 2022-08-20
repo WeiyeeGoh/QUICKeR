@@ -1,2 +1,0 @@
-/usr/bin/ar qc libhsm_encryption.a  CMakeFiles/hsm_encryption.dir/hsm_aes_gcm.c.o CMakeFiles/hsm_encryption.dir/aes.c.o
-/usr/bin/ranlib libhsm_encryption.a

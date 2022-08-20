@@ -1,2 +1,0 @@
-/usr/bin/ar qc libcloudhsmpkcs11.a  CMakeFiles/cloudhsmpkcs11.dir/common.c.o CMakeFiles/cloudhsmpkcs11.dir/pkcs11.c.o CMakeFiles/cloudhsmpkcs11.dir/gopt.c.o
-/usr/bin/ranlib libcloudhsmpkcs11.a
