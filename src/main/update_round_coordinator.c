@@ -7,6 +7,7 @@
 #define CLOCKID CLOCK_REALTIME
 #define SIG SIGRTMIN
 
+
 #define errExit(msg)    do { perror(msg); exit(EXIT_FAILURE); \
                         } while (0)
 
@@ -47,6 +48,70 @@ int num_reencrypts = 64;
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
+int recvall (int sockfd, void* recvbuf, int buffsize) {
+    //bzero (recvbuf, buffsize);
+    int total_bytes = 0;
+    int nbytes = 0;
+
+    void* startbuf = recvbuf;
+
+
+    int index = 0;
+    //printf ("Before recv\n");
+    while (total_bytes < buffsize && (nbytes = recv(sockfd, startbuf, buffsize, 0)) > 0){
+        // From here, valid bytes are from recvbuf to recvbuf + nbytes.
+        // You could simply fwrite(fp, recvbuf, nbytes) or similar. 
+        //printf("-----iteration %d------", index);
+        startbuf += nbytes;
+        total_bytes += nbytes;
+        index += 1;
+            
+        if (((char*)recvbuf)[total_bytes-1] == '\0') {
+            break;
+        }
+    }
+    ((char*)recvbuf)[total_bytes +1] = 0;
+    //printf ("Received: %s\n", (char*)recvbuf);
+    return total_bytes;
+}
+
+int sendall (int sockfd, void* sendbuf, int sendsize) {
+    int total_bytes = 0;
+    int nbytes = 0;
+
+    void* startbuf = sendbuf;
+
+    int max_send = 50000;
+    int current_send = sendsize; 
+    if (current_send > max_send) {
+        current_send = max_send;
+    }
+
+    int i = 0;
+    printf ("Before send\n");
+    while (sendsize > 0 && (nbytes = send(sockfd, startbuf, current_send, 0)) > 0 ) {
+        printf("iteration %d\n", i);
+        startbuf += nbytes;
+        sendsize -= nbytes;
+        total_bytes += nbytes;
+
+        current_send = sendsize; 
+        if (current_send > max_send) {
+            current_send = max_send;
+        }
+
+        printf("iteration %d\n", i);
+        printf("nbytes: %d\n", nbytes);
+        i += 1;
+    }
+
+    printf ("total_bytes: %d\n", total_bytes);
+    printf ("nbytes: %d\n", nbytes);
+    printf ("sendsize: %d\n", sendsize);
+    printf ("Sent: %s\n", (char*) sendbuf);
+    return total_bytes;
+}
+
 int connect_to_server(port) {
     int sockfd;
     struct sockaddr_in servaddr, cli;
@@ -63,7 +128,7 @@ int connect_to_server(port) {
 
     // assign IP, PORT
     servaddr.sin_family = AF_INET;
-    xservaddr.sin_addr.s_addr = inet_addr("172.31.41.106");
+    servaddr.sin_addr.s_addr = inet_addr("172.31.24.149");
     //servaddr.sin_addr.s_addr = inet_addr("127.0.0.1");
     servaddr.sin_port = htons(port);
 
@@ -77,6 +142,72 @@ int connect_to_server(port) {
         printf("connected to the server on port %d..\n", port);
 
     return sockfd;
+}
+
+
+void test_start(int sockfd)
+{
+   
+    char* buff = malloc (sizeof(char) * MAX);
+    bzero(buff, MAX);
+
+    char* input = "START ";
+    strncat(buff, input, strlen(input) + 1);
+
+
+    sendall(sockfd, buff, sizeof(buff)+1);
+
+    bzero(buff, MAX);
+    recvall(sockfd, buff, MAX);
+}
+
+void test_end(int sockfd)
+{
+   
+    char* buff = malloc (sizeof(char) * MAX);
+    bzero(buff, MAX);
+
+    char* input = "END ";
+    strncat(buff, input, strlen(input) + 1);
+
+
+    sendall(sockfd, buff, sizeof(buff)+1);
+
+    bzero(buff, MAX);
+    recvall(sockfd, buff, MAX);
+}
+
+void test_dowork(int sockfd)
+{
+    printf("hi\n");
+    printf("hi\n");
+    printf("hi\n");
+    printf("hi\n");
+    printf("hi\n");
+    printf("Number: %d\n", MAX);
+    char* buff = malloc (sizeof(char) * MAX);
+    int n;
+    printf("hi\n");
+
+    bzero(buff, MAX);
+    n = 0;
+
+    printf("hi\n");
+
+    char* input = "START ";
+    strncat(buff, input, strlen(input) + 1);
+    //strncat(buff, key_arr[option], strlen(key_arr[option]));
+
+    printf("fisrt\n");
+    printf("strlenbuff: %d\n", strlen(buff)+1);
+    printf("second\n");
+    printf("sizeofbuff: %d\n", sizeof(buff));
+
+    sendall(sockfd, buff, sizeof(buff)+1);
+
+    bzero(buff, MAX);
+    recvall(sockfd, buff, MAX);
+    printf("From Server : %s\n", buff);
 }
 
 int main() {
@@ -110,7 +241,10 @@ int main() {
     // 2) When cmd received, it'll do all of its assigned updates
     // 3) sends response back to coord when done
 
-    int sockfd = connect_to_server(7654);
+    printf("Before Connect\n");
+    int sockfd = connect_to_server(7003);
+    printf("Before CMD\n");
+    test_end(sockfd);
 
 
     return 0;

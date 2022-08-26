@@ -6,6 +6,7 @@
 
 #define CLOCKID CLOCK_REALTIME
 #define SIG SIGRTMIN
+#define PORT 7003
 
 #define errExit(msg)    do { perror(msg); exit(EXIT_FAILURE); \
                         } while (0)
@@ -46,6 +47,63 @@ int num_reencrypts = 64;
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+
+int recvall2 (int sockfd, void* recvbuf, int buffsize) {
+    //bzero (recvbuf, buffsize);
+    int total_bytes = 0;
+    int nbytes = 0;
+
+    void* startbuf = recvbuf;
+
+
+    int index = 0;
+    //printf ("Before recv\n");
+    while (total_bytes < buffsize && (nbytes = recv(sockfd, startbuf, buffsize, 0)) > 0){
+        // From here, valid bytes are from recvbuf to recvbuf + nbytes.
+        // You could simply fwrite(fp, recvbuf, nbytes) or similar. 
+        //printf("-----iteration %d------", index);
+        startbuf += nbytes;
+        total_bytes += nbytes;
+        index += 1;
+            
+        if (((char*)recvbuf)[total_bytes-1] == '\0') {
+            break;
+        }
+    }
+    ((char*)recvbuf)[total_bytes +1] = 0;
+    //printf ("Received: %s\n", (char*)recvbuf);
+    return total_bytes;
+}
+
+int sendall2 (int sockfd, void* sendbuf, int sendsize) {
+    int total_bytes = 0;
+    int nbytes = 0;
+
+    void* startbuf = sendbuf;
+
+    int max_send = 50000;
+    int current_send = sendsize; 
+    if (current_send > max_send) {
+        current_send = max_send;
+    }
+
+    int i = 0;
+    while (sendsize > 0 && (nbytes = send(sockfd, startbuf, current_send, 0)) > 0 ) {
+        startbuf += nbytes;
+        sendsize -= nbytes;
+        total_bytes += nbytes;
+
+        current_send = sendsize; 
+        if (current_send > max_send) {
+            current_send = max_send;
+        }
+
+        i += 1;
+    }
+
+    return total_bytes;
+}
+
   
 // GET IP ADDRESS
 void checkHostName(int hostname)
@@ -106,6 +164,11 @@ void TimerSet (int interval) {
     pthread_t thread1;
     int iret1 = pthread_create( &thread1, NULL, timeron, interval);
 }
+
+
+
+
+
 
 int main (int argc, char** argv) {
 
@@ -219,256 +282,343 @@ int main (int argc, char** argv) {
     // If first line of arguments is filled, then we modify starting_key_index and num_of_assigned_keys. 
 
 
+    // Setup Listener
+    int sockfd, connfd, connlen;
+    struct sockaddr_in servaddr, cli;
 
-    // Get value before we update it
-
-    double thisstart = get_time_in_seconds();
-    for (int i=0; i < num_of_assigned_keys; i++) {
-
-        printf("Doing Update %d on KEY %s\n", i, db_key_list[starting_key_index + i]);
-        
-        int db_key_index = total_messages % num_of_db_keys;
-        //int rv = update_dek_key ( &reuse_session, database_keys[db_key_index], key_handle);
-
-        printf("Updating IP Addr to %d\n", db_key_ip_addr[i]);
-        update_ip_addr(db_key_ip_addr[i]);
-
-
-        // Get value before we update it
-        char * received_before;
-        int length_before;
-
-        rv = updatable_download_and_decrypt(&reuse_session, key_handle, db_key_list[starting_key_index + i], &received_before, &length_before);
-
-        printf("after first dl\n");
-        
-        //printf ("Before update\n");  
-        //rv = updatable_update_dek_and_ciphertext(&reuse_session, key_handle, db_key_list[starting_key_index + i], num_reencrypts);
-        
-
-        printf("after first update\n");
-
-        // Test it works??
-        char * received_after;
-        int length_after;
-        rv = updatable_download_and_decrypt(&reuse_session, key_handle, db_key_list[starting_key_index + i], &received_after, &length_after);
-
-        printf("length_after: %d\n", length_after);
-        printf("length_before: %d\n", length_before);
-
-        if (strncmp (received_after, received_before, length_before) != 0) {
-           printf ("Error with decrypting into original message, not same.\n"    );
-        } else {
-           printf ("INFO Decryption AFTER UPDATE worked\n");
-        } 
-        free(received_after);
-        free(received_before);
-
-    
-
-           
-      
-        total_messages += 1;
-        if (total_messages % 100 == 0) {
-           printf ("Message # %d\n", total_messages);
-        }
-    }
-    double thisend = get_time_in_seconds();
-
-    printf ("Time passed:   %f\n", (thisend - thisstart));
-    printf ("Num rotations: %d\n", total_messages);
-    printf ("[LOG] latency_final: %f\n\n", (double)(thisend-thisstart) / (double) (total_messages)); 
-
-    pkcs11_finalize_session(reuse_session);
-
-
-}
-
-
-
-
-int amain (int argc, char** argv) {
-    int count_forks = 0;
-    int parent = 1;
-    int pid = NULL;
-    while (parent && count_forks < num_forks) {
-        count_forks ++;
-        pid = fork();
-        parent = (pid != 0);
-    }
-
-    current_pid = count_forks;
-    if (pid != 0) {
-        current_pid = 0;
-    }
-
-
-    // Benchmark Numbers
-    reuse_message_size = 100000;       // 10 KB
-    reuse_message = malloc(reuse_message_size);
-    memset(reuse_message, 'a', reuse_message_size);
-
-    CK_RV rv;
-    int rc = EXIT_FAILURE;
-    
-    struct parameters param = {0};
-    init_params(argv[1], &param);
-
-    args = param.pkcs_parameters;
-    ip_addr = param.redis_parameters.ip_addr;
-    portnum = param.redis_parameters.portnum;
-
-
-
-    int initcount = 0;
-    rv = pkcs11_initialize(args.library);
-    while (CKR_OK != rv) {
-        rv = pkcs11_initialize(args.library);
-
-        if (initcount > 10) {
-            printf("FAILED: pkcs11_initialization\n");
-            return rc;
-        }
-
-        initcount += 1;
-        sleep(1);
-    }
-
-
-    rv = pkcs11_open_session(args.pin, &reuse_session);
-    while (CKR_OK != rv) {
-        reuse_session = NULL;
-        rv = pkcs11_open_session(args.pin, &reuse_session);
-
-        if (initcount > 20) {
-            printf("FAILED: pkcs11_open_session\n");
-            return EXIT_FAILURE;
-        }
-
-        initcount += 1;
-        sleep(1);
-    }
-
-
-
-    printf("Starting Key Gen\n");
-    // // Generate K_master Key Handle
-    // for (int i = 0; i < num_keys; i++) {
-    //     // Initialize Wrapping Key Handle (k-master)
-    //     generate_new_k_master(&reuse_session, 16, &(key_handle_arr[i]));   
-    // }
-    
-    printf("Ending Key Gen\n");
-
-
-    sleep(40 - initcount);
-    // HardCode K_master key handle
-    //key_handle = key_handle_arr[0];
-    key_handle = 8126470;
-
-    // Get Machine IP address 
-    char* machine_ip_address  = get_ip_address();
-    int ip_addr_size = sizeof(machine_ip_address);
-
-    // Create database_keys space
-    database_keys = (char**) malloc(sizeof(char*) * (num_of_db_keys));
-    memset(database_keys, 0, sizeof(char*) * (num_of_db_keys));
-
-
-
-    // Generate num_of_db_keys number of keys into our database_keys datastructure
-    for (int i=0; i < num_of_db_keys; i++) {
-
-        database_keys[i] = (char * ) malloc(sizeof(char) * (key_size + ip_addr_size + 12));
-        memset(database_keys[i], 0, sizeof(char) * (key_size + ip_addr_size + 12));
-
-        for (int j=0; j < key_size; j++) {
-            database_keys[i][j]= (char) (97 + ((int)(i / (int)(pow(26,j))) % 26));
-        }
-
-        database_keys[i][key_size] = '\0';
-        strcat(database_keys[i], "_");
-        strcat(database_keys[i], machine_ip_address);
-	   strcat(database_keys[i], "_");
-        char tmpstr[10];
-	   memset(tmpstr, 0, 10);
-        sprintf(tmpstr, "%d", getpid());
-	   strcat(database_keys[i], tmpstr);
-    }
-
-    printf ("Before setup\n");    
-    // Setup Database with num_of_db_keys number of keys and encrypted messages
-    for (int i = 0; i < num_of_db_keys; i++) {
-        rv = updatable_encrypt_and_upload(&reuse_session, key_handle, database_keys[i], reuse_message, reuse_message_size, 64);
-    } 
-
-    /*
-    rv = updatable_update_dek_and_ciphertext(&reuse_session, key_handle, database_keys[0], num_reencrypts);
-    
-    char * received1;
-    int length1;
-    rv = updatable_download_and_decrypt(&reuse_session, key_handle, database_keys[0], &received1, &length1);
-
-    if (strncmp (reuse_message, received1, reuse_message_size) != 0) {
-        printf ("Error with decrypting into original message, not same.\n");
+    // socket create and verification
+    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sockfd == -1) {
+        printf("socket creation failed...\n");
         exit(0);
     }
     else {
-        printf ("Decryption worked\n");
+        printf("Socket successfully created..\n");
     }
-    */    
-    //sleep(15);
+    bzero(&servaddr, sizeof(servaddr));
+
+    // assign IP, PORT
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    servaddr.sin_port = htons(PORT);
+
+    // Binding newly created socket to given IP and verification
+    if ((bind(sockfd, (SA*)&servaddr, sizeof(servaddr))) != 0) {
+        printf("socket bind failed...\n");
+        exit(0);
+    }
+    else {
+        printf("Socket successfully binded..\n");
+    }
+
+    // Now server is ready to listen and verification
+    if ((listen(sockfd, 5)) != 0) {
+        printf("Listen failed on port %d...\n", PORT);
+        exit(0);
+    }
+    else {
+        printf("Server listening on port %d..\n", PORT);
+    }
+    connlen = sizeof(cli);
+
+    char* recvbuff = (char*)malloc (MAX);
 
 
-    //TimerSet (290);
-    TimerSet(170);
 
-    double thisstart = get_time_in_seconds();
-    while (time_expired == 0) {
-        
-        int db_key_index = total_messages % num_of_db_keys;
-        //int rv = update_dek_key ( &reuse_session, database_keys[db_key_index], key_handle);
-        
-        //printf ("Before update\n");
-	   rv = updatable_update_dek_and_ciphertext(&reuse_session, key_handle, database_keys[db_key_index], num_reencrypts);
-        //printf("After Update\n");
-	
-    	//char * received;
-    	//int length;
-    	//rv = updatable_download_and_decrypt(&reuse_session, key_handle, database_keys[db_key_index], &received, &length);
 
-    	//if (strncmp (reuse_message, received, reuse_message_size) != 0) {
-        //    printf ("Error with decrypting into original message, not same.\n"    );
-        //    exit(0);
-        //}
-        //else {
-        //    printf ("INFO Decryption AFTER UPDATE worked\n");
-        //} 
-        
+    // Listen For Start of Round and then Perform full rotation on db
+    for(;;) {
 
-	   //exit(0);	
-
-    	if (rv == -1 || total_messages % num_reencrypts == 0) {
-           rv = updatable_encrypt_and_upload(&reuse_session, key_handle, database_keys[db_key_index], reuse_message, reuse_message_size, 64);
-           //rv = encrypt_and_upload(&reuse_session, key_handle, database_keys[db_key_index], reuse_message, reuse_message_size);
-    	   
-	   printf("INFO reencrypting\n");
-	   if (rv == -1) {
-	       total_messages -= 1;
-	   }
+        connfd = accept(sockfd, (SA*)&cli, &connlen);
+        if (connfd < 0) {
+            printf("server accept failed...\n");
+            //exit(0);
         }
-    	
-    	total_messages += 1;
-    	if (total_messages % 100 == 0) {
-           printf ("Message # %d\n", total_messages);
-    	}
-    }
-    double thisend = get_time_in_seconds();
+        else {
+            //printf("server accept the client...\n");
+        }
 
-    printf ("Time passed:   %f\n", (thisend - thisstart));
-    printf ("Num rotations: %d\n", total_messages);
-    printf ("[LOG] latency_final: %f\n\n", (double)(thisend-thisstart) / (double) (total_messages)); 
+        recvall2(connfd, recvbuff, MAX);
+        printf("RAW COMMAND: %.5s\n", recvbuff);
+
+        int number_of_splits;
+        char** command_splits = split_by_space(recvbuff, &number_of_splits);
+        char* command = command_splits[0];
+
+
+        //If command is START, then perform full update on db
+        if (strlen(command) == 5 && strncmp(command, "START", 5) == 0) {
+
+            double thisstart = get_time_in_seconds();
+            for (int i=0; i < num_of_assigned_keys; i++) {
+
+                printf("Doing Update %d on KEY %s\n", i, db_key_list[starting_key_index + i]);
+                
+                int db_key_index = total_messages % num_of_db_keys;
+                //int rv = update_dek_key ( &reuse_session, database_keys[db_key_index], key_handle);
+
+                printf("Updating IP Addr to %d\n", db_key_ip_addr[i]);
+                update_ip_addr(db_key_ip_addr[i]);
+
+
+                // Get value before we update it
+                char * received_before;
+                int length_before;
+
+                rv = updatable_download_and_decrypt(&reuse_session, db_key_list[starting_key_index + i], &received_before, &length_before);
+
+                rv = updatable_update_dek_and_ciphertext(&reuse_session, db_key_list[starting_key_index + i], num_reencrypts);
+                
+                // Test it works??
+                char * received_after;
+                int length_after;
+                rv = updatable_download_and_decrypt(&reuse_session, db_key_list[starting_key_index + i], &received_after, &length_after);
+
+                printf("length_after: %d\n", length_after);
+                printf("length_before: %d\n", length_before);
+
+                if (strncmp (received_after, received_before, length_before) != 0) {
+                   printf ("Error with decrypting into original message, not same.\n"    );
+                } else {
+                   printf ("INFO Decryption AFTER UPDATE worked\n");
+                } 
+                free(received_after);
+                free(received_before);
+
+            
+
+                   
+              
+                total_messages += 1;
+                if (total_messages % 100 == 0) {
+                   printf ("Message # %d\n", total_messages);
+                }
+            }
+            double thisend = get_time_in_seconds();
+
+            printf ("Time passed:   %f\n", (thisend - thisstart));
+            printf ("Num rotations: %d\n", total_messages);
+            printf ("[LOG] latency_final: %f\n\n", (double)(thisend-thisstart) / (double) (total_messages)); 
+
+
+
+            // Send response back to update coordiantor
+            bzero(recvbuff, sizeof(recvbuff));
+            char* input = "DONE ";
+            strncat(recvbuff, input, strlen(input)+1);
+            sendall2(connfd, recvbuff, strlen(recvbuff)+1);
+
+
+        } else if (strlen(command) == 3 && strncmp(command, "END", 3) == 0) {
+            printf("Ending Program\n");
+            exit(0);
+            
+            // Send response back to update coordiantor
+            bzero(recvbuff, sizeof(recvbuff));
+            char* input = "DONE ";
+            strncat(recvbuff, input, strlen(input)+1);
+            sendall2(connfd, recvbuff, strlen(recvbuff)+1);
+
+            break;
+        } else {
+            printf("Command is not recognized!\n");
+            printf("COMMAND: %.5s\n", command);
+            exit(0);
+        }
+
+
+    }
 
     pkcs11_finalize_session(reuse_session);
 
+
 }
+
+
+
+
+// int amain (int argc, char** argv) {
+//     int count_forks = 0;
+//     int parent = 1;
+//     int pid = NULL;
+//     while (parent && count_forks < num_forks) {
+//         count_forks ++;
+//         pid = fork();
+//         parent = (pid != 0);
+//     }
+
+//     current_pid = count_forks;
+//     if (pid != 0) {
+//         current_pid = 0;
+//     }
+
+
+//     // Benchmark Numbers
+//     reuse_message_size = 100000;       // 10 KB
+//     reuse_message = malloc(reuse_message_size);
+//     memset(reuse_message, 'a', reuse_message_size);
+
+//     CK_RV rv;
+//     int rc = EXIT_FAILURE;
+    
+//     struct parameters param = {0};
+//     init_params(argv[1], &param);
+
+//     args = param.pkcs_parameters;
+//     ip_addr = param.redis_parameters.ip_addr;
+//     portnum = param.redis_parameters.portnum;
+
+
+
+//     int initcount = 0;
+//     rv = pkcs11_initialize(args.library);
+//     while (CKR_OK != rv) {
+//         rv = pkcs11_initialize(args.library);
+
+//         if (initcount > 10) {
+//             printf("FAILED: pkcs11_initialization\n");
+//             return rc;
+//         }
+
+//         initcount += 1;
+//         sleep(1);
+//     }
+
+
+//     rv = pkcs11_open_session(args.pin, &reuse_session);
+//     while (CKR_OK != rv) {
+//         reuse_session = NULL;
+//         rv = pkcs11_open_session(args.pin, &reuse_session);
+
+//         if (initcount > 20) {
+//             printf("FAILED: pkcs11_open_session\n");
+//             return EXIT_FAILURE;
+//         }
+
+//         initcount += 1;
+//         sleep(1);
+//     }
+
+
+
+//     printf("Starting Key Gen\n");
+//     // // Generate K_master Key Handle
+//     // for (int i = 0; i < num_keys; i++) {
+//     //     // Initialize Wrapping Key Handle (k-master)
+//     //     generate_new_k_master(&reuse_session, 16, &(key_handle_arr[i]));   
+//     // }
+    
+//     printf("Ending Key Gen\n");
+
+
+//     sleep(40 - initcount);
+//     // HardCode K_master key handle
+//     //key_handle = key_handle_arr[0];
+//     key_handle = 8126470;
+
+//     // Get Machine IP address 
+//     char* machine_ip_address  = get_ip_address();
+//     int ip_addr_size = sizeof(machine_ip_address);
+
+//     // Create database_keys space
+//     database_keys = (char**) malloc(sizeof(char*) * (num_of_db_keys));
+//     memset(database_keys, 0, sizeof(char*) * (num_of_db_keys));
+
+
+
+//     // Generate num_of_db_keys number of keys into our database_keys datastructure
+//     for (int i=0; i < num_of_db_keys; i++) {
+
+//         database_keys[i] = (char * ) malloc(sizeof(char) * (key_size + ip_addr_size + 12));
+//         memset(database_keys[i], 0, sizeof(char) * (key_size + ip_addr_size + 12));
+
+//         for (int j=0; j < key_size; j++) {
+//             database_keys[i][j]= (char) (97 + ((int)(i / (int)(pow(26,j))) % 26));
+//         }
+
+//         database_keys[i][key_size] = '\0';
+//         strcat(database_keys[i], "_");
+//         strcat(database_keys[i], machine_ip_address);
+// 	   strcat(database_keys[i], "_");
+//         char tmpstr[10];
+// 	   memset(tmpstr, 0, 10);
+//         sprintf(tmpstr, "%d", getpid());
+// 	   strcat(database_keys[i], tmpstr);
+//     }
+
+//     printf ("Before setup\n");    
+//     // Setup Database with num_of_db_keys number of keys and encrypted messages
+//     for (int i = 0; i < num_of_db_keys; i++) {
+//         rv = updatable_encrypt_and_upload(&reuse_session, key_handle, database_keys[i], reuse_message, reuse_message_size, 64);
+//     } 
+
+//     /*
+//     rv = updatable_update_dek_and_ciphertext(&reuse_session, key_handle, database_keys[0], num_reencrypts);
+    
+//     char * received1;
+//     int length1;
+//     rv = updatable_download_and_decrypt(&reuse_session, key_handle, database_keys[0], &received1, &length1);
+
+//     if (strncmp (reuse_message, received1, reuse_message_size) != 0) {
+//         printf ("Error with decrypting into original message, not same.\n");
+//         exit(0);
+//     }
+//     else {
+//         printf ("Decryption worked\n");
+//     }
+//     */    
+//     //sleep(15);
+
+
+//     //TimerSet (290);
+//     TimerSet(170);
+
+//     double thisstart = get_time_in_seconds();
+//     while (time_expired == 0) {
+        
+//         int db_key_index = total_messages % num_of_db_keys;
+//         //int rv = update_dek_key ( &reuse_session, database_keys[db_key_index], key_handle);
+        
+//         //printf ("Before update\n");
+// 	   rv = updatable_update_dek_and_ciphertext(&reuse_session, database_keys[db_key_index], num_reencrypts);
+//         //printf("After Update\n");
+	
+//     	//char * received;
+//     	//int length;
+//     	//rv = updatable_download_and_decrypt(&reuse_session, key_handle, database_keys[db_key_index], &received, &length);
+
+//     	//if (strncmp (reuse_message, received, reuse_message_size) != 0) {
+//         //    printf ("Error with decrypting into original message, not same.\n"    );
+//         //    exit(0);
+//         //}
+//         //else {
+//         //    printf ("INFO Decryption AFTER UPDATE worked\n");
+//         //} 
+        
+
+// 	   //exit(0);	
+
+//     	if (rv == -1 || total_messages % num_reencrypts == 0) {
+//            rv = updatable_encrypt_and_upload(&reuse_session, key_handle, database_keys[db_key_index], reuse_message, reuse_message_size, 64);
+//            //rv = encrypt_and_upload(&reuse_session, key_handle, database_keys[db_key_index], reuse_message, reuse_message_size);
+    	   
+// 	   printf("INFO reencrypting\n");
+// 	   if (rv == -1) {
+// 	       total_messages -= 1;
+// 	   }
+//         }
+    	
+//     	total_messages += 1;
+//     	if (total_messages % 100 == 0) {
+//            printf ("Message # %d\n", total_messages);
+//     	}
+//     }
+//     double thisend = get_time_in_seconds();
+
+//     printf ("Time passed:   %f\n", (thisend - thisstart));
+//     printf ("Num rotations: %d\n", total_messages);
+//     printf ("[LOG] latency_final: %f\n\n", (double)(thisend-thisstart) / (double) (total_messages)); 
+
+//     pkcs11_finalize_session(reuse_session);
+
+// }

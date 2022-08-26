@@ -375,7 +375,7 @@ int main (int argc, char** argv) {
 
             char * received;
             int length;
-            rv = updatable_download_and_decrypt(&reuse_session, key_handle, database_keys[db_key_index], &received, &length);
+            rv = updatable_download_and_decrypt(&reuse_session, database_keys[db_key_index], &received, &length);
 
             if (rv == -1) { 
                 redisContext *conn = NULL;

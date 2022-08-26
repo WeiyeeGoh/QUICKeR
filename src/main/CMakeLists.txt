@@ -49,7 +49,7 @@ target_link_libraries(populate_database_updatable hiredis_storage)
 target_link_libraries(populate_database_updatable actions)
 
 
-#[[add_executable(test_update_round_workers test_update_round_workers.c)
+add_executable(test_update_round_workers test_update_round_workers.c)
 target_link_libraries(test_update_round_workers cloudhsmpkcs11)
 target_link_libraries(test_update_round_workers cd_encryption)
 target_link_libraries(test_update_round_workers hsm_encryption)
@@ -57,10 +57,9 @@ target_link_libraries(test_update_round_workers hiredis_storage)
 target_link_libraries(test_update_round_workers actions)
 
 
-
 add_executable(update_round_coordinator update_round_coordinator.c)
 target_link_libraries(update_round_coordinator cloudhsmpkcs11)
 target_link_libraries(update_round_coordinator cd_encryption)
 target_link_libraries(update_round_coordinator hsm_encryption)
 target_link_libraries(update_round_coordinator hiredis_storage)
-target_link_libraries(update_round_coordinator actions)]]
+target_link_libraries(update_round_coordinator actions)

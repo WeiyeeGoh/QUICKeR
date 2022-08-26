@@ -114,7 +114,7 @@ int main (int argc, char** argv) {
 
 
     // Get list of ip_addresses (HARDCODED NOW)
-    char* server_ip_addr_list[] = {"172.31.8.137"};
+    char* server_ip_addr_list[] = {"172.31.47.126"};
     int server_count = sizeof(server_ip_addr_list) / sizeof(server_ip_addr_list[0]);
     // char* server_ip_addr_string_list = param.redis_parameters.ip_addr;
     // int server_count;
@@ -220,7 +220,9 @@ int main (int argc, char** argv) {
     char** key_type_values = malloc(sizeof(char*) * key_type_count);
     char key_handle_string[15];
     sprintf(key_handle_string, "%d", key_handle);
-    key_type_values[0] = key_handle_string;
+    char* b64_key_handle = base64_enc((char*) key_handle_string, 15);
+
+    key_type_values[0] = b64_key_handle;
     key_type_values[1] = "0";
     key_type_values[2] = b64_wrapped_key;
     key_type_values[3] = b64_ciphertext_hat;

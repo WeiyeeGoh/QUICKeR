@@ -36,7 +36,7 @@ int num_reencrypts = 64;
 
 #define MAX 16000000 // = 10 MB
 //#define MAX 20000
-#define PORT 7654
+#define PORT 6000
 #define ARRAY_SIZE 20
 #define SA struct sockaddr
 
@@ -57,16 +57,19 @@ int num_reencrypts = 64;
 
 
 
-int recvall (int sockfd, void* recvbuf, int buffsize) {
+int recvall2 (int sockfd, void* recvbuf, int buffsize) {
     //bzero (recvbuf, buffsize);
     int total_bytes = 0;
     int nbytes = 0;
 
     void* startbuf = recvbuf;
 
+    // printf("buffsize?: %d\n", buffsize);
+    // printf("total_bytes: %d\n", total_bytes);
+
 
     int index = 0;
-    //printf ("Before recv\n");
+    printf ("Before recv\n");
     while (total_bytes < buffsize && (nbytes = recv(sockfd, startbuf, buffsize, 0)) > 0){
         // From here, valid bytes are from recvbuf to recvbuf + nbytes.
         // You could simply fwrite(fp, recvbuf, nbytes) or similar. 
@@ -74,8 +77,13 @@ int recvall (int sockfd, void* recvbuf, int buffsize) {
         startbuf += nbytes;
         total_bytes += nbytes;
         index += 1;
+        // printf("startbuff: %d\n", startbuf);
+        // printf("totalbytes: %d\n", total_bytes);
+        // printf("index: %d\n", index);
+        // printf("nbytes: %d\n", nbytes);
             
         if (((char*)recvbuf)[total_bytes-1] == '\0') {
+            printf("hit null terminator\n");
             break;
         }
     }
@@ -84,6 +92,34 @@ int recvall (int sockfd, void* recvbuf, int buffsize) {
     return total_bytes;
 }
 
+int sendall2 (int sockfd, void* sendbuf, int sendsize) {
+    int total_bytes = 0;
+    int nbytes = 0;
+
+    void* startbuf = sendbuf;
+
+    int max_send = 50000;
+    int current_send = sendsize; 
+    if (current_send > max_send) {
+        current_send = max_send;
+    }
+
+    int i = 0;
+    while (sendsize > 0 && (nbytes = send(sockfd, startbuf, current_send, 0)) > 0 ) {
+        startbuf += nbytes;
+        sendsize -= nbytes;
+        total_bytes += nbytes;
+
+        current_send = sendsize; 
+        if (current_send > max_send) {
+            current_send = max_send;
+        }
+
+        i += 1;
+    }
+
+    return total_bytes;
+}
 
 int myThreadFun(int* t_num) {
     int thread_num = *(t_num);
@@ -127,24 +163,29 @@ int myThreadFun(int* t_num) {
     }
     len = sizeof(cli);
 
-    char* buff = (char*)malloc (MAX);
+    char* newbuff = (char*)malloc (MAX);
+    bzero(newbuff, MAX);
 
+    printf("Ready to accept connections\n");
+    for(;;) {   
 
-    for(;;) {
-
+        printf("WAITING FOR ACCEPT\n");
+        printf("SOCKFD: %d\n", sockfd);
+        printf("connfd: %d\n", connfd);
         connfd = accept(sockfd, (SA*)&cli, &len);
         if (connfd < 0) {
             printf("server accept failed...\n");
             //exit(0);
         }
-        else {
-            //printf("server accept the client...\n");
-        }
 
-        recvall(connfd, buff, MAX);
+        printf("Connection got?\n");
+        printf("MAX: %d\n", MAX);
 
-        // print
-        printf("buff: %s\n", buff);
+        recvall2(connfd, newbuff, MAX);
+
+        printf("GET SOMETHING\n");
+        printf("buff: %s\n", newbuff);
+
 
 
     }
