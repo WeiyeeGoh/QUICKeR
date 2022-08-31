@@ -144,9 +144,12 @@ int main (int argc, char** argv) {
 
     double start_time = get_time_in_seconds();
 
+    struct parameters param = {0};
+    init_params(argv[1], &param);
 
     // Benchmark Numbers
-    reuse_message_size = 100000;       // 10 KB
+    db_keys_per_server = param.data_parameters.keys_per_db;
+    reuse_message_size = param.data_parameters.message_size;       // 10 KB
     reuse_message = malloc(reuse_message_size);
     memset(reuse_message, 'a', reuse_message_size);
     reuse_message[reuse_message_size-1] = '\0';
@@ -154,15 +157,12 @@ int main (int argc, char** argv) {
 
     CK_RV rv;
     int rc = EXIT_FAILURE;
-    
-    struct parameters param = {0};
-    init_params(argv[1], &param);
 
     args = param.pkcs_parameters;
     portnum = param.redis_parameters.portnum; // keep as is
+    // printf("message size: %d\n", param.data_parameters.message_size);
+    // printf("keys_per_db: %d\n", param.data_parameters.keys_per_db);
 
-
-    
 
 
     // Get list of ip_addresses (HARDCODED NOW)

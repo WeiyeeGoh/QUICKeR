@@ -46,9 +46,15 @@ struct redis_arguments {
     int portnum;
 };
 
+struct data_arguments {
+    int message_size;
+    int keys_per_db;
+};
+
 struct parameters { 
     struct pkcs_arguments pkcs_parameters;
     struct redis_arguments redis_parameters;
+    struct data_arguments data_parameters;
 };
 
 struct key_to_db {

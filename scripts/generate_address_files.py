@@ -16,6 +16,57 @@ private_key_pem = "~/.ssh/lawrence-ucsb-test-1.pem"
 all_ip_addresses = []
 region = "us-east-2"
 ec2 = boto3.resource('ec2', region_name=region)
+ec2_client = boto3.client('ec2', region_name=region)
+
+
+#######GET STOPPED CLIENT MACHINES################
+stopped_client_machines = ec2_client.describe_instances(Filters=[
+    {
+        'Name': 'instance-state-name',
+        'Values': ['stopped']
+    },
+    {
+        'Name': 'tag:Client_Type',
+        'Values': ['Client_Test']
+    }
+])
+stuff = response_one['Reservations']
+total =0
+stopped_client_list = []
+for res in stuff:
+    print(len(res["Instances"]))
+    for i in range(len(res["Instances"])):
+        print(res["Instances"][i]['InstanceId'])
+        total += 1
+        stopped_client_list.append(res["Instances"][i]['InstanceId'])
+print("total: %d\n" %(total))
+
+#########Get Stopped DB Machines#######################
+stopped_db_machines = ec2_client.describe_instances(Filters=[
+    {
+        'Name': 'instance-state-name',
+        'Values': ['stopped']
+    },
+    {
+        'Name': 'tag:Type',
+        'Values': ['new_redisdb_test']
+    }
+])
+stuff = response_one['Reservations']
+total =0
+stopped_db_list = []
+for res in stuff:
+    print(len(res["Instances"]))
+    for i in range(len(res["Instances"])):
+        print(res["Instances"][i]['InstanceId'])
+        total += 1
+        stopped_client_list.append(res["Instances"][i]['InstanceId'])
+print("total: %d\n" %(total))
+
+
+
+
+
 
 # for instance in ec2.instances.all():
 #     name = ''
@@ -29,36 +80,11 @@ ec2 = boto3.resource('ec2', region_name=region)
 # all_ip_addresses.sort()
 # print(all_ip_addresses)
 
-ec2_client = boto3.client('ec2', region_name=region)
-
-response_one = ec2_client.describe_instances(Filters=[
-    {
-        'Name': 'instance-state-name',
-        'Values': ['stopped']
-    },
-    {
-        'Name': 'tag:Type',
-        'Values': ['Client']
-    }
-])
-
-stuff = response_one['Reservations']
-#print(stuff[3])
-total =0
-stopped_client_list = []
-for res in stuff:
-    print(len(res["Instances"]))
-    for i in range(len(res["Instances"])):
-        print(res["Instances"][i]['InstanceId'])
-        total += 1
-        stopped_client_list.append(res["Instances"][i]['InstanceId'])
-print("total: %d\n" %(total))
 
 
 
-exit(0)
 
-
+exit(0);
 
 
 def wait_instance_until_resady(instance_id):

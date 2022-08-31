@@ -104,7 +104,7 @@ void send_start(int sockfd)
 }
 
 
-void test_end(int sockfd)
+void send_client_end(int sockfd)
 {
    
     char* buff = malloc (sizeof(char) * MAX);
@@ -120,6 +120,23 @@ void test_end(int sockfd)
     recvall(sockfd, buff, MAX);
 }
 
+void send_client_stop(int sockfd)
+{
+       
+    char* buff = malloc (sizeof(char) * MAX);
+    bzero(buff, MAX);
+
+    char* input = "STOP ";
+    strncat(buff, input, strlen(input) + 1);
+
+
+    sendall(sockfd, buff, sizeof(buff)+1);
+
+    bzero(buff, MAX);
+    recvall(sockfd, buff, MAX);
+}
+
+
 void send_client_root_key(int sockfd, char* root_key) {
     char* buff = malloc (sizeof(char) * MAX);
     bzero(buff, MAX);
@@ -133,26 +150,6 @@ void send_client_root_key(int sockfd, char* root_key) {
 
     bzero(buff, MAX);
     recvall(sockfd, buff, MAX);
-}
-
-void test_dowork(int sockfd)
-{
-    char* buff = malloc (sizeof(char) * MAX);
-    int n;
-
-    bzero(buff, MAX);
-    n = 0;
-
-    char* input = "START ";
-    strncat(buff, input, strlen(input) + 1);
-    //strncat(buff, key_arr[option], strlen(key_arr[option]));
-
-
-    sendall(sockfd, buff, sizeof(buff)+1);
-
-    bzero(buff, MAX);
-    recvall(sockfd, buff, MAX);
-    //printf("From Server : %s\n", buff);
 }
 
 
@@ -284,29 +281,29 @@ int main(int argc, char** argv) {
         }
 
 
-        // // Notify new root key to each Client Machine. Client Machine saves new root key. 
-        // printf("Notify new root key to client machines\n");
-        // char root_key_string[10];
-        // sprintf(root_key_string, "%d", key_handle);
-        // for(int i=0; i < client_machine_count; i++) {
-        //     conn = NULL;
-        //     int sockfd = connect_to_server(client_machines_address[i], client_machines_port[i]);    
-        //     printf("tryna send stuff\n");
-        //     send_client_root_key(sockfd, root_key_string);
-        //     close (sockfd);
-        // }
-        // printf("DONE notifying new root key to client machines\n");
+        // Notify new root key to each Client Machine. Client Machine saves new root key. 
+        printf("Notify new root key to client machines\n");
+        char root_key_string[10];
+        sprintf(root_key_string, "%d", key_handle);
+        for(int i=0; i < client_machine_count; i++) {
+            conn = NULL;
+            int sockfd = connect_to_server(client_machines_address[i], client_machines_port[i]);    
+            printf("tryna send stuff\n");
+            send_client_root_key(sockfd, root_key_string);
+            close (sockfd);
+        }
+        printf("DONE notifying new root key to client machines\n");
 
-        // // Notify All Client Machines to start
-        // printf("start up client machines\n");
-        // for(int i=0; i < client_machine_count; i++) {
-        //     conn = NULL;
-        //     int sockfd = connect_to_server(client_machines_address[i], client_machines_port[i]);    
-        //     bzero(additional_params, 10);
-        //     send_start(sockfd);
-        //     close (sockfd);
-        // }
-        // printf("DONE starting up client machiens\n");
+        // Notify All Client Machines to start
+        printf("start up client machines\n");
+        for(int i=0; i < client_machine_count; i++) {
+            conn = NULL;
+            int sockfd = connect_to_server(client_machines_address[i], client_machines_port[i]);    
+            bzero(additional_params, 10);
+            send_start(sockfd);
+            close (sockfd);
+        }
+        printf("DONE starting up client machiens\n");
 
 
         // Notify All Update Machines to start. Hold connections here until all are done. 
@@ -327,6 +324,16 @@ int main(int argc, char** argv) {
         free(tid);
         free(sockfd_arr);
 
+
+        // Notify All Client Machines to Stop and Exit
+        printf("Tell Client machines to stop process\n");
+        for(int i=0; i < client_machine_count; i++) {
+            conn = NULL;
+            int sockfd = connect_to_server(client_machines_address[i], client_machines_port[i]);    
+            send_client_stop(sockfd);
+            close (sockfd);
+        }
+        printf("DONE notifying clients to end\n");
     }
 
     printf("COMPETED ALL MY ROUNDS (%d)\n", total_rounds);
