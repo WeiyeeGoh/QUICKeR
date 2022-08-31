@@ -150,38 +150,38 @@ int commandListener(int* sockfd) {
         }
 
         recvall(connfd, recvbuff, MAX);
-        printf("RAW COMMAND: %.5s\n", recvbuff);
+        //printf("RAW COMMAND: %.5s\n", recvbuff);
 
         int number_of_splits;
         char** command_splits = split_by_space(recvbuff, &number_of_splits);
         char* command = command_splits[0];
 
         if (strlen(command) == 5 && strncmp(command, "START", 5) == 0) {
-            printf("START RECEIVED\n");
+            //printf("START RECEIVED\n");
             pthread_mutex_lock(&run_workload_lock);
             run_workload = 1;
             pthread_mutex_unlock(&run_workload_lock);
 
         } else if (strlen(command) == 4 && strncmp(command, "STOP", 4) == 0) {
-            printf("STOP RECEIVED\n");
+            //printf("STOP RECEIVED\n");
             pthread_mutex_lock(&run_workload_lock);
             run_workload = 0;
             pthread_mutex_unlock(&run_workload_lock);
 
         } else if (strlen(command) == 3 && strncmp(command, "END", 3) == 0) {\
-            printf("END RECEIVED\n");
+            //printf("END RECEIVED\n");
             pthread_mutex_lock(&run_workload_lock);
             run_workload = 0;
             end_program = 1;
             pthread_mutex_unlock(&run_workload_lock);
         } else if (strlen(command) == 7 && strncmp(command, "ROOTKEY", 7) == 0) {\
-            printf("ROOTKEY RECEIVED\n");
+            //printf("ROOTKEY RECEIVED\n");
             
             pthread_mutex_lock(&run_workload_lock);
             key_handle = atoi(command_splits[1]);
             pthread_mutex_unlock(&run_workload_lock);
 
-            printf("ROOTKEY completed\n");
+            //printf("ROOTKEY completed\n");
         }
 
         // Send response back to update coordiantor
@@ -244,15 +244,10 @@ int main (int argc, char** argv) {
     pthread_create(&thread_id, NULL, commandListener, (void*)&sockfd);
     ///////////////END/////////////////////
 
-
-    printf("Hello\n");
-
     // Benchmark Numbers
     reuse_message_size = 100000;       // 10 KB
     reuse_message = malloc(reuse_message_size);
     memset(reuse_message, 'a', reuse_message_size);
-
-    printf("Hello\n");
 
     CK_RV rv;
     int rc = EXIT_FAILURE;
@@ -264,9 +259,6 @@ int main (int argc, char** argv) {
     args = param.pkcs_parameters;
     ip_addr = param.redis_parameters.ip_addr;
     portnum = param.redis_parameters.portnum;
-
-
-    printf("Hello\n");
 
     // Session Handler Stuff    
     int initcount = 0;
@@ -316,7 +308,7 @@ int main (int argc, char** argv) {
     while ( getline(&line, &len, fp) != -1) {
         entry_count += 1;
     }
-    printf("%d Keys in %s\n", entry_count, argv[2]);
+    //printf("%d Keys in %s\n", entry_count, argv[2]);
 
     // use number of keys to generate two arrays. (1) holds all the key names. (2) holds the server ip address
     char** db_key_list = malloc(sizeof(char*) * entry_count);
@@ -328,7 +320,7 @@ int main (int argc, char** argv) {
     // Read from the file and add each entry to our two arrays
     int total_keys = 0;
     while ( getline(&line, &len, fp) != -1) {
-        printf("%s\n", line);
+        //printf("%s\n", line);
 
         int split_count;
         char** split_arr = split_by_space(line, &split_count);
@@ -336,8 +328,8 @@ int main (int argc, char** argv) {
             db_key_list[total_keys] = split_arr[0];
             split_arr[1][strlen(split_arr[1])-1] = '\0';
             db_key_ip_addr[total_keys] = split_arr[1];
-            printf("KEY: %s\n", split_arr[0]); 
-            printf("IP ADDR: %s\n", split_arr[1]);
+            // printf("KEY: %s\n", split_arr[0]); 
+            // printf("IP ADDR: %s\n", split_arr[1]);
         }
         total_keys += 1;
     }
@@ -430,14 +422,11 @@ int main (int argc, char** argv) {
                     free(received);
                 }
 
-                printf("DID A DOWNLOAD AND IT WORKED?\n");
 
             } else {
                 upload_count += 1;
 
-                printf("starting encrypt\n");
                 rv = updatable_encrypt_and_upload(&reuse_session, key_handle, db_key_list[db_key_index], reuse_message, reuse_message_size, 64);
-                printf("DID AN ENCRYPT AND IT WORKED?\n");
             }
                 
             total_messages += 1;

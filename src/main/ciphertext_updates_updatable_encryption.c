@@ -179,7 +179,7 @@ int main (int argc, char** argv) {
     while ( getline(&line, &len, fp) != -1) {
         entry_count += 1;
     }
-    printf("%d Keys in %s\n", entry_count, argv[2]);
+    //printf("%d Keys in %s\n", entry_count, argv[2]);
 
     // use number of keys to generate two arrays. (1) holds all the key names. (2) holds the server ip address
     char** db_key_list = malloc(sizeof(char*) * entry_count);
@@ -191,7 +191,6 @@ int main (int argc, char** argv) {
     // Read from the file and add each entry to our two arrays
     int total_keys = 0;
     while ( getline(&line, &len, fp) != -1) {
-        printf("%s\n", line);
 
         int split_count;
         char** split_arr = split_by_space(line, &split_count);
@@ -199,8 +198,8 @@ int main (int argc, char** argv) {
             db_key_list[total_keys] = split_arr[0];
             split_arr[1][strlen(split_arr[1])-1] = '\0';
             db_key_ip_addr[total_keys] = split_arr[1];
-            printf("KEY: %s\n", split_arr[0]); 
-            printf("IP ADDR: %s\n", split_arr[1]);
+            // printf("KEY: %s\n", split_arr[0]); 
+            // printf("IP ADDR: %s\n", split_arr[1]);
         }
         total_keys += 1;
     }
@@ -284,7 +283,7 @@ int main (int argc, char** argv) {
         }
 
         recvall(connfd, recvbuff, MAX);
-        printf("RAW COMMAND: %.5s\n", recvbuff);
+        //printf("RAW COMMAND: %.5s\n", recvbuff);
 
         int number_of_splits;
         char** command_splits = split_by_space(recvbuff, &number_of_splits);
@@ -296,18 +295,18 @@ int main (int argc, char** argv) {
 
             starting_key_index = atoi(command_splits[1]);
             assigned_key_index_offset = atoi(command_splits[2]);
-            printf("Staring Index: %d\n", starting_key_index);
-            printf("Index Offset: %d\n", assigned_key_index_offset);
+            // printf("Staring Index: %d\n", starting_key_index);
+            // printf("Index Offset: %d\n", assigned_key_index_offset);
 
             double thisstart = get_time_in_seconds();
             for (int key_index=starting_key_index; key_index < total_keys; key_index+=assigned_key_index_offset) {
 
-                printf("Doing Update %d on KEY %s\n", key_index, db_key_list[key_index]);
+                //printf("Doing Update %d on KEY %s\n", key_index, db_key_list[key_index]);
                 
                 int db_key_index = total_messages % num_of_db_keys;
                 //int rv = update_dek_key ( &reuse_session, database_keys[db_key_index], key_handle);
 
-                printf("Updating IP Addr to %d\n", db_key_ip_addr[key_index]);
+                //printf("Updating IP Addr to %d\n", db_key_ip_addr[key_index]);
                 update_ip_addr(db_key_ip_addr[key_index]);
 
 
@@ -324,8 +323,8 @@ int main (int argc, char** argv) {
                 int length_after;
                 rv = updatable_download_and_decrypt(&reuse_session, db_key_list[key_index], &received_after, &length_after);
 
-                printf("length_after: %d\n", length_after);
-                printf("length_before: %d\n", length_before);
+                // printf("length_after: %d\n", length_after);
+                // printf("length_before: %d\n", length_before);
 
                 if (strncmp (received_after, received_before, length_before) != 0) {
                    printf ("Error with decrypting into original message, not same.\n"    );

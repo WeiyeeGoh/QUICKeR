@@ -18,7 +18,7 @@ print_as_hex_values(uint8_t* ciphertext, int ciphertext_length) {
         fprintf(stderr, "Could not allocate hex array\n");
         return -1;
     }
-    printf("Downloaded ctxt data: %s\n", hex_array);
+    //printf("Downloaded ctxt data: %s\n", hex_array);
     if (NULL != hex_array) {
         free(hex_array);
     }
@@ -828,11 +828,14 @@ int updatable_download_and_decrypt( CK_SESSION_HANDLE_PTR session,
     ct_hat_data_en* ciphertext_hat = (ct_hat_data_en*)downloaded_values[1];
     int data_length = sizes[2];
     uint8_t * ciphertext = (uint8_t *)downloaded_values[2];
-    printf("......... DOWNLOADED MESSAGES FROM DB ..........");
-    printf("......... Wrap Length: %d\n", wrap_length);
-    printf("......... Header Length: %d\n", header_length);
-    printf("......... Data Length: %d\n", data_length);
-    printf("......... .......................... ..........");
+    // printf("......... DOWNLOADED MESSAGES FROM DB ..........\n");
+    // printf("......... Wrap Length: %d\n", wrap_length);
+    // printf("......... Header Length: %d\n", header_length);
+    // printf("......... Data Length: %d\n", data_length);
+    // printf("......... Key Wrap: %s\n", ae_key_wrap);
+    // printf("......... Data Length: %d\n", data_length);
+    // printf("......... Data Length: %d\n", data_length);
+    // printf("......... .......................... ..........\n");
 
 
     CK_OBJECT_HANDLE wrapping_key_handle = atoi(downloaded_values[3]);
@@ -870,8 +873,8 @@ int updatable_download_and_decrypt( CK_SESSION_HANDLE_PTR session,
         } else {
             printf("HSM_AES_DECRYPT ERROR\n");
         }
-        printf("Wrap Length: %d\n", wrap_length);
-        printf("Decryption Key Length: %d\n", decryption_key_length);
+        // printf("Wrap Length: %d\n", wrap_length);
+        // printf("Decryption Key Length: %d\n", decryption_key_length);
         fail_counter += 1;
         sleep(1);
         failcont = get_time_in_seconds();
@@ -899,7 +902,7 @@ int updatable_download_and_decrypt( CK_SESSION_HANDLE_PTR session,
     *retrieved_message = malloc( *retrieved_message_length);
     memset(*retrieved_message, 0, *retrieved_message_length);
     strncpy(*retrieved_message, decrypted_message, *retrieved_message_length);
-    printf("retrieved_message_length: %d\n", *retrieved_message_length);
+    //printf("retrieved_message_length: %d\n", *retrieved_message_length);
 
 
     free(decrypted_message);
