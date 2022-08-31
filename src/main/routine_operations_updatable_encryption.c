@@ -244,6 +244,9 @@ int main (int argc, char** argv) {
     pthread_create(&thread_id, NULL, commandListener, (void*)&sockfd);
     ///////////////END/////////////////////
 
+    struct parameters param = {0};
+    init_params(argv[1], &param);
+
     // Benchmark Numbers
     //reuse_message_size = 100000;       // 10 KB
     reuse_message_size = param.data_parameters.message_size;
@@ -253,8 +256,7 @@ int main (int argc, char** argv) {
     CK_RV rv;
     int rc = EXIT_FAILURE;
     
-    struct parameters param = {0};
-    init_params(argv[1], &param);
+
     //update_portnum(portnum + 1);
 
     args = param.pkcs_parameters;
