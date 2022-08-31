@@ -828,6 +828,12 @@ int updatable_download_and_decrypt( CK_SESSION_HANDLE_PTR session,
     ct_hat_data_en* ciphertext_hat = (ct_hat_data_en*)downloaded_values[1];
     int data_length = sizes[2];
     uint8_t * ciphertext = (uint8_t *)downloaded_values[2];
+    printf("......... DOWNLOADED MESSAGES FROM DB ..........");
+    printf("......... Wrap Length: %d\n", wrap_length);
+    printf("......... Header Length: %d\n", header_length);
+    printf("......... Data Length: %d\n", data_length);
+    printf("......... .......................... ..........");
+
 
     CK_OBJECT_HANDLE wrapping_key_handle = atoi(downloaded_values[3]);
 
