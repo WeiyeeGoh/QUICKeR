@@ -42,7 +42,7 @@ print(all_ip_addresses)
 # Set up the command_list
 output_logname = ""
 if sys.argv[1] == "pull":
-    cmd = "cd QUICKeR; git reset --hard HEAD; git checkout main; git reset --hard HEAD; git pull origin main"
+    cmd = "cd QUICKeR; git reset --hard HEAD; git checkout endtoend; git reset --hard HEAD; git pull origin endtoend"
     command_list = [cmd] * len(all_ip_addresses)
 elif sys.argv[1] == "run":
     date = datetime.datetime.now()

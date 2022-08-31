@@ -244,12 +244,15 @@ int main (int argc, char** argv) {
     pthread_create(&thread_id, NULL, commandListener, (void*)&sockfd);
     ///////////////END/////////////////////
 
-   
+
+    printf("Hello\n");
 
     // Benchmark Numbers
     reuse_message_size = 100000;       // 10 KB
     reuse_message = malloc(reuse_message_size);
     memset(reuse_message, 'a', reuse_message_size);
+
+    printf("Hello\n");
 
     CK_RV rv;
     int rc = EXIT_FAILURE;
@@ -261,6 +264,9 @@ int main (int argc, char** argv) {
     args = param.pkcs_parameters;
     ip_addr = param.redis_parameters.ip_addr;
     portnum = param.redis_parameters.portnum;
+
+
+    printf("Hello\n");
 
     // Session Handler Stuff    
     int initcount = 0;
