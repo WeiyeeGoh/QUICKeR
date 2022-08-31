@@ -89,9 +89,58 @@ char* get_ip_address()
     return IPbuffer;
 }
 
+int read_address_file_to_arr(char* filename, char*** arr1, char*** arr2) {
+    FILE *fp;
+    fp = fopen(filename, "r");
+    if (fp == NULL) {
+        printf("EXIT FAILURE\n");
+        exit(EXIT_FAILURE);
+    }
+
+    // setup vars for reading each line
+    int read = 0;
+    char  *line = NULL;
+    int len = 0;
+    int entry_count = 0;
+
+    // count number of keys in db
+    while ( getline(&line, &len, fp) != -1) {
+        entry_count += 1;
+    }
+
+    // use number of keys to generate two arrays. (1) holds all the key names. (2) holds the server ip address
+    *arr1 = malloc(sizeof(char*) * entry_count);
+    *arr2 = malloc(sizeof(char*) * entry_count);
+
+    // seek back to the beginning of the file
+    fseek(fp, 0, SEEK_SET);
+
+    // Read from the file and add each entry to our two arrays
+    int index = 0;
+    while ( getline(&line, &len, fp) != -1) {
+        printf("%s\n", line);
+
+        int split_count;
+        char** split_arr = split_by_space(line, &split_count);
+        if (split_count == 2) {
+            (*arr1)[index] = split_arr[0];
+            split_arr[1][strlen(split_arr[1])-1] = '\0';
+            (*arr2)[index] = split_arr[1];
+            printf("KEY: %s\n", split_arr[0]); 
+            printf("IP ADDR: %s\n", split_arr[1]);
+        }
+        index += 1;
+    }
+
+    return entry_count;
+}
+
 
 int main (int argc, char** argv) {
 
+    if (argc < 3) {
+        printf("Need arguments.txt and db_address.txt as params\n");
+    }
 
     double start_time = get_time_in_seconds();
 
@@ -113,9 +162,15 @@ int main (int argc, char** argv) {
     portnum = param.redis_parameters.portnum; // keep as is
 
 
+    
+
+
     // Get list of ip_addresses (HARDCODED NOW)
-    char* server_ip_addr_list[] = {"172.31.47.126"};
-    int server_count = sizeof(server_ip_addr_list) / sizeof(server_ip_addr_list[0]);
+    //char* server_ip_addr_list[] = {"172.31.47.126"};
+    //int server_count = sizeof(server_ip_addr_list) / sizeof(server_ip_addr_list[0]);
+    char** server_ip_addr_list;
+    char** db_port;
+    int server_count = read_address_file_to_arr(argv[2], &server_ip_addr_list, &db_port);
     // char* server_ip_addr_string_list = param.redis_parameters.ip_addr;
     // int server_count;
     // server_ip_addr_list = split_by_comma(server_ip_addr_string_list, &server_count);
@@ -279,22 +334,30 @@ int main (int argc, char** argv) {
 
 
     // Generate list of keys for each database
-
+    printf("Server Count: %d\n", server_count);
+    printf("ip_addr1: %s\n", server_ip_addr_list[0]);
+    printf("ip_addr2: %s\n", server_ip_addr_list[1]);
+    printf("ip_addr1: %s\n", db_port[0]);
+    printf("ip_addr2: %s\n", db_port[1]);
     for (int i = 0; i < server_count; i++) {
         printf("Sending to server %d\n", i);
 
         for (int k=0; k < key_type_count; k++) {
             listbuf[0] = '\0';
+            int test_i = 0;
             for (int j = i; j < num_of_db_keys; j+=server_count) {
                 strcat(listbuf, key_prefix_list[k]);
                 strcat(listbuf, database_keys[j]);
                 if (j + server_count < num_of_db_keys) {
                     strcat(listbuf, " ");
                 }
+                test_i += 1;
             }
+            printf("TEST I = %d\n", test_i);
 
-            printf("Updating IP Addr to %d\n", server_ip_addr_list[i]);
+            printf("Updating IP Addr to %s\n", server_ip_addr_list[i]);
             update_ip_addr(server_ip_addr_list[i]);
+            update_portnum(atoi(db_port[i]));
 
 
 
