@@ -77,17 +77,17 @@ int init_params (const char* filename, struct parameters* args) {
     read = getline(&tmpbuf, &len, fp);
     tmpbuf[strlen(tmpbuf)-1] = '\0';
     args->redis_parameters.portnum = atoi (tmpbuf);
-    free (tmpbuf);
+    //free (tmpbuf);
 
     // Get Data Parameter 
     read = getline(&tmpbuf, &len, fp);
     args->data_parameters.message_size = atoi(tmpbuf);
     tmpbuf[strlen(tmpbuf)-1] = '\0';
-    free(tmpbuf);
+    //free(tmpbuf);
     read = getline(&tmpbuf, &len, fp);
     args->data_parameters.keys_per_db = atoi(tmpbuf);
     tmpbuf[strlen(tmpbuf)-1] = '\0';
-    free(tmpbuf);
+    //free(tmpbuf);
 
 
 

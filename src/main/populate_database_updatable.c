@@ -132,6 +132,7 @@ int read_address_file_to_arr(char* filename, char*** arr1, char*** arr2) {
         index += 1;
     }
 
+    close(fp);
     return entry_count;
 }
 
@@ -160,8 +161,8 @@ int main (int argc, char** argv) {
 
     args = param.pkcs_parameters;
     portnum = param.redis_parameters.portnum; // keep as is
-    // printf("message size: %d\n", param.data_parameters.message_size);
-    // printf("keys_per_db: %d\n", param.data_parameters.keys_per_db);
+    printf("message size: %d\n", reuse_message_size);
+    printf("keys_per_db: %d\n", db_keys_per_server);
 
 
 
@@ -219,33 +220,27 @@ int main (int argc, char** argv) {
     
     printf("Ending Key Gen\n");
 
-
     // HardCode K_master key handle
     //key_handle = key_handle_arr[0];
     int key_handle_list[] = {2097212, 2097213, 2097214};
     //8126470
     key_handle = 2097212;
-
     // Get Machine IP address 
     char* machine_ip_address  = get_ip_address();
     int ip_addr_size = sizeof(machine_ip_address);
-
     // Create database_keys space
     int num_of_db_keys = db_keys_per_server * server_count;
     database_keys = (char**) malloc(sizeof(char*) * (num_of_db_keys));
     memset(database_keys, 0, sizeof(char*) * (num_of_db_keys));
-
     // Generate ciphertexts for all keys    
     // Encrypt Data using Updatable Encryption
     AE_key ae_key;
     AE_KeyGen( & ae_key, 64);
-
     ct_hat_data_en ciphertext_hat;
     int buffer_length = sizeof(AE_ctx_header) + reuse_message_size + 64 * (2 * RHO + NU);
     uint8_t * ciphertext = (uint8_t * ) malloc(buffer_length);
 
     int ctx_length = AE_Encrypt(&ae_key, reuse_message, &ciphertext_hat, ciphertext, reuse_message_size);
-
 
     // Wrap the Decryption Key  
     CK_BYTE_PTR wrapped_key = NULL;
