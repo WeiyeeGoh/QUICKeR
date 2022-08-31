@@ -79,6 +79,7 @@ int connect_to_server(char* ip_address, char* port_string) {
     printf("HELLO\n");
 
 
+
     // connect the client socket to server socket
     if (connect(sockfd, (SA*)&servaddr, sizeof(servaddr)) != 0) {
         printf("connection with the server failed on port %d...\n", port);
@@ -86,6 +87,7 @@ int connect_to_server(char* ip_address, char* port_string) {
     }
     else
         printf("connected to the server on port %d..\n", port);
+
 
     return sockfd;
 }
@@ -279,7 +281,7 @@ int main(int argc, char** argv) {
     char** db_port;
     int client_machine_count = read_address_file_to_arr(argv[1], &client_machines_address, &client_machines_port);
     int update_machine_count = read_address_file_to_arr(argv[2], &update_machines_address, &update_machines_port);
-    int db_count = read_address_file_to_arr(argv[2], &db_address, &db_port);
+    int db_count = read_address_file_to_arr(argv[3], &db_address, &db_port);
     printf("COmpleted Setup\n");
 
 
@@ -296,8 +298,11 @@ int main(int argc, char** argv) {
         redisContext *conn = NULL;
         for (int i=0; i < db_count; i++) {
             printf("SENDing new root key to db\n");
+            printf("Ip Address: %s\n", db_address[i]);
+            printf("Portnum: %s\n", db_port[i]);
+            printf("Root Key: %d\n", key_handle);
             update_ip_addr(db_address[i]);
-            update_portnum(db_port[i]);
+            update_portnum(atoi(db_port[i]));
             send_root_key(key_handle, conn);
             printf("done sending new root key to db\n");
         }

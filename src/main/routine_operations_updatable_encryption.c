@@ -396,18 +396,25 @@ int main (int argc, char** argv) {
                 int length;
                 rv = updatable_download_and_decrypt(&reuse_session, db_key_list[db_key_index], &received, &length);
 
-                // if (rv == -1) { 
-                //     redisContext *conn = NULL;
-                //     //int return_val = init_redis (&conn);
-                //     set(db_key_wraps[db_key_index], (char*)wraps[db_key_index], wrap_lens[db_key_index], conn);
-                //     set(db_key_headers[db_key_index], &(ciphertext_hats[db_key_index]), sizeof (ct_hat_data_en), conn);
-                //     set(db_key_ctxts[db_key_index], ciphertexts[db_key_index], ctxt_lens[db_key_index], conn);
+                if (rv == -1) { 
+                    redisContext *conn = NULL;
+                    // //int return_val = init_redis (&conn);
+                    // set(db_key_wraps[db_key_index], (char*)wraps[db_key_index], wrap_lens[db_key_index], conn);
+                    // set(db_key_headers[db_key_index], &(ciphertext_hats[db_key_index]), sizeof (ct_hat_data_en), conn);
+                    // set(db_key_ctxts[db_key_index], ciphertexts[db_key_index], ctxt_lens[db_key_index], conn);
 
-                //     //close_redis (conn);
-                //     total_messages -= 1;
-                // }
+
+                    // repair the ciphertext
+                    printf("GOT A RV=-1 ERROR. REPAIRING CIPHERTEXT INSDEAD\n");
+                    rv = updatable_encrypt_and_upload(&reuse_session, key_handle, db_key_list[db_key_index], reuse_message, reuse_message_size, 64);
+
+                    //close_redis (conn);
+                    total_messages -= 1;
+                }
                 if (strncmp (reuse_message, received, reuse_message_size) != 0) {
                     printf ("Error with decrypting into original message, not same.\n");
+                    printf("Received length is %d\n", length);
+                    printf("First 7 chars of this NOT SAME message is: %.7s\n", received);
                     //exit(0);
                 }
 
