@@ -13,7 +13,7 @@ import os
 
 # NEW KEYDB MACHINE
 argument_files = ["172.31.7.183\nbob:Applejack2022\n"] 
-private_key_pem = "<<YOUR_PRIVATE_KEY_PEM_FILENAME>>"
+private_key_pem = "~/.ssh/lawrence-ucsb-test-1.pem"
 
 activated_client_indexes = None
 

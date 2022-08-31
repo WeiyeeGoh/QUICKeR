@@ -378,6 +378,11 @@ int setall (int numkeys, char** keys, char** values, int** value_sizes, redisCon
 
 		char* b64encoded = base64_enc(values[i], value_sizes[i]);
 
+		if (i == 3) {
+			printf("SET KEY: %s\n", keys[i]);
+	    	printf("SET VALUE: %s\n", b64encoded);
+	    }
+
 		strncat (buff, keys[i], strlen(keys[i]));    
 		strncat (buff, " ", 1);
 		strncat (buff, b64encoded, strlen(b64encoded));
@@ -391,6 +396,36 @@ int setall (int numkeys, char** keys, char** values, int** value_sizes, redisCon
 	sendall(sockfd, buff, size);
 	recvall(sockfd, buff, MAX);
 
+	close (sockfd);
+	return 1;
+}
+
+int send_root_key (int root_key, redisContext *conn) {
+
+	init_redis(conn);
+
+	int size = 8;
+	buff[0] = 0;
+	strncat (buff, "ROOTKEY ", size);
+
+
+    char root_key_string[15];
+    sprintf(root_key_string, "%d", root_key);
+    printf("root_key_string: %s\n", root_key_string);
+    char* b64_root_key = base64_enc((char*) root_key_string, 15);
+    printf("b64_root_key: %s\n", b64_root_key);
+
+
+	strncat (buff, b64_root_key, strlen(b64_root_key));
+	size += strlen(b64_root_key) + 2;
+
+	sendall(sockfd, buff, size);
+	recvall(sockfd, buff, MAX);
+
+	printf("GOD BACK STUFF\n");
+
+
+	free(b64_root_key);
 	close (sockfd);
 	return 1;
 }

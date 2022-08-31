@@ -31,6 +31,7 @@ char* get(char *key, redisContext *conn, int *length);
 
 char** getall(int numkeys, char **keys, int** sizes, redisContext *conn);
 int setall (int numkeys, char** keys, char** values, int** value_sizes, redisContext *conn);
+int send_root_key (int root_key, redisContext *conn);
 
 int timed_set(char *key, char *value, int value_length, redisContext *conn);
 double get_timed_set();

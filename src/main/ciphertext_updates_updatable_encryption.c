@@ -6,7 +6,7 @@
 
 #define CLOCKID CLOCK_REALTIME
 #define SIG SIGRTMIN
-#define PORT 7003
+#define PORT 7000
 
 #define errExit(msg)    do { perror(msg); exit(EXIT_FAILURE); \
                         } while (0)
@@ -47,62 +47,6 @@ int num_reencrypts = 64;
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-
-int recvall2 (int sockfd, void* recvbuf, int buffsize) {
-    //bzero (recvbuf, buffsize);
-    int total_bytes = 0;
-    int nbytes = 0;
-
-    void* startbuf = recvbuf;
-
-
-    int index = 0;
-    //printf ("Before recv\n");
-    while (total_bytes < buffsize && (nbytes = recv(sockfd, startbuf, buffsize, 0)) > 0){
-        // From here, valid bytes are from recvbuf to recvbuf + nbytes.
-        // You could simply fwrite(fp, recvbuf, nbytes) or similar. 
-        //printf("-----iteration %d------", index);
-        startbuf += nbytes;
-        total_bytes += nbytes;
-        index += 1;
-            
-        if (((char*)recvbuf)[total_bytes-1] == '\0') {
-            break;
-        }
-    }
-    ((char*)recvbuf)[total_bytes +1] = 0;
-    //printf ("Received: %s\n", (char*)recvbuf);
-    return total_bytes;
-}
-
-int sendall2 (int sockfd, void* sendbuf, int sendsize) {
-    int total_bytes = 0;
-    int nbytes = 0;
-
-    void* startbuf = sendbuf;
-
-    int max_send = 50000;
-    int current_send = sendsize; 
-    if (current_send > max_send) {
-        current_send = max_send;
-    }
-
-    int i = 0;
-    while (sendsize > 0 && (nbytes = send(sockfd, startbuf, current_send, 0)) > 0 ) {
-        startbuf += nbytes;
-        sendsize -= nbytes;
-        total_bytes += nbytes;
-
-        current_send = sendsize; 
-        if (current_send > max_send) {
-            current_send = max_send;
-        }
-
-        i += 1;
-    }
-
-    return total_bytes;
-}
 
   
 // GET IP ADDRESS
@@ -277,6 +221,7 @@ int main (int argc, char** argv) {
 
     // Update each of this instance's assigned keys
     int starting_key_index = 0;
+    int assigned_key_index_offset = 1;
     int num_of_assigned_keys = total_keys;
 
     // If first line of arguments is filled, then we modify starting_key_index and num_of_assigned_keys. 
@@ -338,7 +283,7 @@ int main (int argc, char** argv) {
             //printf("server accept the client...\n");
         }
 
-        recvall2(connfd, recvbuff, MAX);
+        recvall(connfd, recvbuff, MAX);
         printf("RAW COMMAND: %.5s\n", recvbuff);
 
         int number_of_splits;
@@ -349,30 +294,35 @@ int main (int argc, char** argv) {
         //If command is START, then perform full update on db
         if (strlen(command) == 5 && strncmp(command, "START", 5) == 0) {
 
-            double thisstart = get_time_in_seconds();
-            for (int i=0; i < num_of_assigned_keys; i++) {
+            starting_key_index = atoi(command_splits[1]);
+            assigned_key_index_offset = atoi(command_splits[2]);
+            printf("Staring Index: %d\n", starting_key_index);
+            printf("Index Offset: %d\n", assigned_key_index_offset);
 
-                printf("Doing Update %d on KEY %s\n", i, db_key_list[starting_key_index + i]);
+            double thisstart = get_time_in_seconds();
+            for (int key_index=starting_key_index; key_index < total_keys; key_index+=assigned_key_index_offset) {
+
+                printf("Doing Update %d on KEY %s\n", key_index, db_key_list[key_index]);
                 
                 int db_key_index = total_messages % num_of_db_keys;
                 //int rv = update_dek_key ( &reuse_session, database_keys[db_key_index], key_handle);
 
-                printf("Updating IP Addr to %d\n", db_key_ip_addr[i]);
-                update_ip_addr(db_key_ip_addr[i]);
+                printf("Updating IP Addr to %d\n", db_key_ip_addr[key_index]);
+                update_ip_addr(db_key_ip_addr[key_index]);
 
 
                 // Get value before we update it
                 char * received_before;
                 int length_before;
 
-                rv = updatable_download_and_decrypt(&reuse_session, db_key_list[starting_key_index + i], &received_before, &length_before);
+                rv = updatable_download_and_decrypt(&reuse_session, db_key_list[key_index], &received_before, &length_before);
 
-                rv = updatable_update_dek_and_ciphertext(&reuse_session, db_key_list[starting_key_index + i], num_reencrypts);
+                rv = updatable_update_dek_and_ciphertext(&reuse_session, db_key_list[key_index], num_reencrypts);
                 
                 // Test it works??
                 char * received_after;
                 int length_after;
-                rv = updatable_download_and_decrypt(&reuse_session, db_key_list[starting_key_index + i], &received_after, &length_after);
+                rv = updatable_download_and_decrypt(&reuse_session, db_key_list[key_index], &received_after, &length_after);
 
                 printf("length_after: %d\n", length_after);
                 printf("length_before: %d\n", length_before);
@@ -385,14 +335,13 @@ int main (int argc, char** argv) {
                 free(received_after);
                 free(received_before);
 
-            
-
                    
               
                 total_messages += 1;
                 if (total_messages % 100 == 0) {
                    printf ("Message # %d\n", total_messages);
                 }
+
             }
             double thisend = get_time_in_seconds();
 
@@ -406,7 +355,7 @@ int main (int argc, char** argv) {
             bzero(recvbuff, sizeof(recvbuff));
             char* input = "DONE ";
             strncat(recvbuff, input, strlen(input)+1);
-            sendall2(connfd, recvbuff, strlen(recvbuff)+1);
+            sendall(connfd, recvbuff, strlen(recvbuff)+1);
 
 
         } else if (strlen(command) == 3 && strncmp(command, "END", 3) == 0) {
@@ -417,7 +366,7 @@ int main (int argc, char** argv) {
             bzero(recvbuff, sizeof(recvbuff));
             char* input = "DONE ";
             strncat(recvbuff, input, strlen(input)+1);
-            sendall2(connfd, recvbuff, strlen(recvbuff)+1);
+            sendall(connfd, recvbuff, strlen(recvbuff)+1);
 
             break;
         } else {

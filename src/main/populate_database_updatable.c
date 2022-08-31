@@ -17,7 +17,7 @@ const int num_keys = 1;
 CK_OBJECT_HANDLE key_handle_arr [1];
 CK_OBJECT_HANDLE key_handle;
 // number of keys per server?
-int db_keys_per_server = 10;
+int db_keys_per_server = 100;
 int key_size = 5;
 char** database_keys;
 
@@ -152,19 +152,24 @@ int main (int argc, char** argv) {
 
 
 
+
+
     printf("Starting Key Gen\n");
     // // Generate K_master Key Handle
     // for (int i = 0; i < num_keys; i++) {
     //     // Initialize Wrapping Key Handle (k-master)
     //     generate_new_k_master(&reuse_session, 16, &(key_handle_arr[i]));   
     // }
+
     
     printf("Ending Key Gen\n");
 
 
     // HardCode K_master key handle
     //key_handle = key_handle_arr[0];
-    key_handle = 8126470;
+    int key_handle_list[] = {2097212, 2097213, 2097214};
+    //8126470
+    key_handle = 2097212;
 
     // Get Machine IP address 
     char* machine_ip_address  = get_ip_address();
@@ -219,8 +224,10 @@ int main (int argc, char** argv) {
     int key_type_count = 5;
     char** key_type_values = malloc(sizeof(char*) * key_type_count);
     char key_handle_string[15];
+    bzero(key_handle_string, 15);
     sprintf(key_handle_string, "%d", key_handle);
     char* b64_key_handle = base64_enc((char*) key_handle_string, 15);
+    printf("B64 Key Handle: %s\n", b64_key_handle);
 
     key_type_values[0] = b64_key_handle;
     key_type_values[1] = "0";

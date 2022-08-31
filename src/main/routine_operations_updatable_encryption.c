@@ -43,8 +43,13 @@ char* reuse_message;
 int reuse_message_size;
 int current_pid = NULL;
 double time_expired = 0;
+int run_workload = 0;
+int end_program = 0;
+pthread_mutex_t run_workload_lock;
 
 int num_reencrypts = 64;
+#define PORT 6000
+
 
 
 // C program to display hostname
@@ -122,23 +127,124 @@ void TimerSet (int interval) {
 }
 
 
+int commandListener(int* sockfd) {
+
+    int connlen;
+    struct sockaddr_in cli;
+    connlen = sizeof(cli);
+
+    char* recvbuff = (char*)malloc (MAX);
+
+    int connfd;
+
+    // Listen For Start of Round and then Perform full rotation on db
+    for(;;) {
+
+        connfd = accept(*sockfd, (SA*)&cli, &connlen);
+        if (connfd < 0) {
+            printf("server accept failed...\n");
+            //exit(0);
+        }
+        else {
+            //printf("server accept the client...\n");
+        }
+
+        recvall(connfd, recvbuff, MAX);
+        printf("RAW COMMAND: %.5s\n", recvbuff);
+
+        int number_of_splits;
+        char** command_splits = split_by_space(recvbuff, &number_of_splits);
+        char* command = command_splits[0];
+
+        if (strlen(command) == 5 && strncmp(command, "START", 5) == 0) {
+            printf("START RECEIVED\n");
+            pthread_mutex_lock(&run_workload_lock);
+            run_workload = 1;
+            pthread_mutex_unlock(&run_workload_lock);
+
+        } else if (strlen(command) == 4 && strncmp(command, "STOP", 4) == 0) {
+            printf("STOP RECEIVED\n");
+            pthread_mutex_lock(&run_workload_lock);
+            run_workload = 0;
+            pthread_mutex_unlock(&run_workload_lock);
+
+        } else if (strlen(command) == 3 && strncmp(command, "END", 3) == 0) {\
+            printf("END RECEIVED\n");
+            pthread_mutex_lock(&run_workload_lock);
+            run_workload = 0;
+            end_program = 1;
+            pthread_mutex_unlock(&run_workload_lock);
+        } else if (strlen(command) == 7 && strncmp(command, "ROOTKEY", 7) == 0) {\
+            printf("ROOTKEY RECEIVED\n");
+            
+            pthread_mutex_lock(&run_workload_lock);
+            key_handle = atoi(command_splits[1]);
+            pthread_mutex_unlock(&run_workload_lock);
+
+            printf("ROOTKEY completed\n");
+        }
+
+        // Send response back to update coordiantor
+        bzero(recvbuff, sizeof(recvbuff));
+        char* input = "DONE ";
+        strncat(recvbuff, input, strlen(input)+1);
+        sendall(connfd, recvbuff, strlen(recvbuff)+1);
+    }
+}
 
 
 int main (int argc, char** argv) {
-    int count_forks = 0;
-    int parent = 1;
-    int pid = NULL;
-    while (parent && count_forks < num_forks) {
-        count_forks ++;
-        pid = fork();
-        parent = (pid != 0);
+
+    if (argc < 3) {
+        printf("Missing Output.txt. Try <../build/src/main/ciphertext_updates_updatable_encryption arguments.txt Output.txt\n");
+    } else if (argc < 2) {
+        printf("Missing arguments.txt. Try <../build/src/main/ciphertext_updates_updatable_encryption arguments.txt Output.txt\n");
     }
 
-    current_pid = count_forks;
-    if (pid != 0) {
-        current_pid = 0;
+    ///////SETUP CONNECTION//////////
+    // Setup Listener
+    int sockfd;
+    struct sockaddr_in servaddr;
+
+    // socket create and verification
+    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sockfd == -1) {
+        printf("socket creation failed...\n");
+        exit(0);
+    }
+    else {
+        printf("Socket successfully created..\n");
+    }
+    bzero(&servaddr, sizeof(servaddr));
+
+    // assign IP, PORT
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    servaddr.sin_port = htons(PORT);
+
+    // Binding newly created socket to given IP and verification
+    if ((bind(sockfd, (SA*)&servaddr, sizeof(servaddr))) != 0) {
+        printf("socket bind failed...\n");
+        exit(0);
+    }
+    else {
+        printf("Socket successfully binded..\n");
     }
 
+    // Now server is ready to listen and verification
+    if ((listen(sockfd, 5)) != 0) {
+        printf("Listen failed on port %d...\n", PORT);
+        exit(0);
+    }
+    else {
+        printf("Server listening on port %d..\n", PORT);
+    }
+
+    pthread_t thread_id;
+    pthread_create(&thread_id, NULL, commandListener, (void*)&sockfd);
+    ///////////////END/////////////////////
+
+   
 
     // Benchmark Numbers
     reuse_message_size = 100000;       // 10 KB
@@ -150,6 +256,7 @@ int main (int argc, char** argv) {
     
     struct parameters param = {0};
     init_params(argv[1], &param);
+    //update_portnum(portnum + 1);
 
     args = param.pkcs_parameters;
     ip_addr = param.redis_parameters.ip_addr;
@@ -183,248 +290,457 @@ int main (int argc, char** argv) {
         sleep(1);
     }
 
-    sleep(40 - initcount);
-
-    // // Generate K_master Key Handle
-    // for (int i = 0; i < num_keys; i++) {
-    //     // Initialize Wrapping Key Handle (k-master)
-    //     generate_new_k_master(&reuse_session, 16, &(key_handle_arr[i]));   
-    // }
 
 
-    // HardCode K_master key handle
-    //key_handle = key_handle_arr[0];
-    key_handle = 8126470;
-
-
-    // Get Machine IP address 
-    char* machine_ip_address  = get_ip_address();
-    int ip_addr_size = sizeof(machine_ip_address);
-
-    // Create database_keys space
-    database_keys = (char**) malloc(sizeof(char*) * (num_of_db_keys));
-    memset(database_keys, 0, sizeof(char*) * (num_of_db_keys));
-
-    // Generate num_of_db_keys number of keys into our database_keys datastructure
-    for (int i=0; i < num_of_db_keys; i++) {
-
-        database_keys[i] = (char * ) malloc(sizeof(char) * (key_size + ip_addr_size + 12));
-        memset(database_keys[i], 0, sizeof(char) * (key_size + ip_addr_size + 12));
-
-        for (int j=0; j < key_size; j++) {
-            database_keys[i][j]= (char) (97 + ((int)(i / (int)(pow(26,j))) % 26));
-        }
-
-        database_keys[i][key_size] = '\0';
-        strcat(database_keys[i], "_");
-        strcat(database_keys[i], machine_ip_address);
-        strcat(database_keys[i], "_");
-        char tmpstr[10];
-        memset(tmpstr, 0, 10);
-        sprintf(tmpstr, "%d", getpid());
-        strcat(database_keys[i], tmpstr);
+    // Read Output.txt and parse it into two arrays
+    FILE *fp;
+    fp = fopen(argv[2], "r");
+    if (fp == NULL) {
+        printf("EXIT FAILURE\n");
+        exit(EXIT_FAILURE);
     }
 
-   
+    // setup vars for reading each line
+    int read = 0;
+    char  *line = NULL;
+    int len = 0;
+    int entry_count = 0;
 
-    db_key_wraps = malloc (num_of_db_keys * sizeof (char*));
-    db_key_headers = malloc (num_of_db_keys * sizeof (char*));
-    db_key_ctxts = malloc (num_of_db_keys * sizeof (char*));
+    // count number of keys in db
+    while ( getline(&line, &len, fp) != -1) {
+        entry_count += 1;
+    }
+    printf("%d Keys in %s\n", entry_count, argv[2]);
 
-    wraps = malloc (num_of_db_keys * sizeof (CK_BYTE_PTR));
-    ciphertext_hats = malloc (num_of_db_keys * sizeof (ct_hat_data_en));
-    ciphertexts = malloc (num_of_db_keys * sizeof (uint8_t*));
+    // use number of keys to generate two arrays. (1) holds all the key names. (2) holds the server ip address
+    char** db_key_list = malloc(sizeof(char*) * entry_count);
+    char** db_key_ip_addr = malloc(sizeof(char*) * entry_count);
 
+    // seek back to the beginning of the file
+    fseek(fp, 0, SEEK_SET);
 
-    wrap_lens = malloc (num_of_db_keys * sizeof (CK_ULONG));
-    ctxt_lens = malloc (num_of_db_keys * sizeof (int));
+    // Read from the file and add each entry to our two arrays
+    int total_keys = 0;
+    while ( getline(&line, &len, fp) != -1) {
+        printf("%s\n", line);
 
-    // Setup Database with num_of_db_keys number of keys and encrypted messages
-    for (int i = 0; i < num_of_db_keys; i++) {
-        //rv = updatable_encrypt_and_upload(&reuse_session, key_handle, database_keys[i], reuse_message, reuse_message_size, 64);
-        CK_SESSION_HANDLE_PTR session = &reuse_session;
-        CK_OBJECT_HANDLE wrapping_key_handle = key_handle;
-        char* ciphertext_id = database_keys[i];
-        char* message = reuse_message;
-        int message_length = reuse_message_size;
-        int total_re_encrypts = 64;
-
-        // Setup Keys to Lookup Values on Redis Store
-        char wrap_text[] = "wrap_";
-        char header_text[] = "header_";
-        char data_text[] = "data_";
-
-        char* kv_key_wrap = malloc(strlen(wrap_text) + strlen(ciphertext_id)+1);
-        char* kv_key_header = malloc(strlen(header_text) + strlen(ciphertext_id)+1);
-        char* kv_key_data = malloc(strlen(data_text) + strlen(ciphertext_id)+1);
-        kv_key_wrap[0] = '\0';
-        kv_key_header[0] = '\0';
-        kv_key_data[0] = '\0';
-
-        strcat(kv_key_wrap, wrap_text);
-        strcat(kv_key_wrap, ciphertext_id);
-        strcat(kv_key_header, header_text);
-        strcat(kv_key_header, ciphertext_id);
-        strcat(kv_key_data, data_text);
-        strcat(kv_key_data, ciphertext_id);
-
-        // Encrypt Data using Updatable Encryption
-        AE_key ae_key[64];
-        for (int j = 0; j < 64; j++) {
-            AE_KeyGen( & (ae_key[j]), total_re_encrypts);
+        int split_count;
+        char** split_arr = split_by_space(line, &split_count);
+        if (split_count == 2) {
+            db_key_list[total_keys] = split_arr[0];
+            split_arr[1][strlen(split_arr[1])-1] = '\0';
+            db_key_ip_addr[total_keys] = split_arr[1];
+            printf("KEY: %s\n", split_arr[0]); 
+            printf("IP ADDR: %s\n", split_arr[1]);
         }
+        total_keys += 1;
+    }
 
-        ct_hat_data_en ciphertext_hat;
-        int buffer_length = sizeof(AE_ctx_header) + message_length + total_re_encrypts * (2 * RHO + NU);
-        uint8_t * ciphertext = (uint8_t * ) malloc(buffer_length);
-        uint8_t * ciphertext2 = (uint8_t * ) malloc(buffer_length);
+    // for(int i=0; i < total_keys; i++) {
+    //     printf("KEY VALUE: %s\n", db_key_list[i]);
+    //     printf("IP ADDR  : %s\n", db_key_ip_addr[i]);
+    // }
+    fclose(fp);
 
-        int ctx_length = AE_Encrypt(&ae_key, message, &ciphertext_hat, ciphertext, message_length);
-        //printf ("buffer_length = %d\n", buffer_length);
-        //printf ("ctx_length 1 = %d\n", ctx_length);
+    printf("Done with keys\n");
 
-        int reencrypt_count = 64;
-        for (int j = 0; j < reencrypt_count; j++) {
-            AE_key* ae_key1 = & (ae_key[j]);
-            AE_key* ae_key2 = & (ae_key[j+1]);
-            
-            delta_token_data delta;
-            int token_work = AE_ReKeyGen(ae_key1, ae_key2, &ciphertext_hat, &delta);
 
-            ct_hat_data_en ciphertext_hat2;
-            ctx_length = AE_ReEncrypt(&delta, &ciphertext_hat, ciphertext, &ciphertext_hat2, ciphertext2, buffer_length-32);
-            ciphertext_hat = ciphertext_hat2;
-            memcpy (ciphertext, ciphertext2, buffer_length);
-            //printf ("ctx_length = %d\n", ctx_length);
 
-        }   
+     key_handle = 8126470;
 
-        free (ciphertext2);
-        CK_RV rv;
 
-        // Wrap the Decryption Key  
-        CK_BYTE_PTR wrapped_key = NULL;
-        CK_ULONG wrapped_len = 0;
+    // Update each of this instance's assigned keys
+    int starting_key_index = 0;
+    int num_of_assigned_keys = total_keys;
 
-        rv = hsm_aes_encrypt(*session, wrapping_key_handle, &(ae_key[reencrypt_count]), sizeof(AE_key), &wrapped_key, &wrapped_len);
-        
-        if (rv != CKR_OK) {
-            printf("HSM Aes Encrypt Failed\n");
-            free(wrapped_key);
-            free(kv_key_wrap);
-                free(kv_key_data);
-                exit(1);
-        }
-
-        /* Upload Header and Ciphertext (no wrap yet) */
-        redisContext *conn = NULL;
-        //int return_val = init_redis (&conn);
-        set(kv_key_wrap, (char*)wrapped_key, wrapped_len, conn);
-        set(kv_key_header, &ciphertext_hat, sizeof (ct_hat_data_en), conn);
-        set(kv_key_data, ciphertext, buffer_length, conn);
-
-        //close_redis (conn);
-
-        db_key_wraps[i] = kv_key_wrap;
-        db_key_headers[i] = kv_key_header;
-        db_key_ctxts[i] = kv_key_data;
-        //memcpy (db_key_wraps[i], kv_key_wrap, strlen(kv_key_wrap));
-        //memcpy (db_key_headers[i], kv_key_header, strlen(kv_key_header));
-        //memcpy (db_key_ctxts[i], kv_key_data, strlen(kv_key_data));
-
-        wraps[i] = wrapped_key;
-        //memcpy (wraps[i], wrapped_key, sizeof (CK_BYTE_PTR));
-        ciphertext_hats[i] = ciphertext_hat;
-        ciphertexts[i] = ciphertext;
-        //memcpy (ciphertexts[i], ciphertext, sizeof (uint8_t *));
-
-        wrap_lens[i] = wrapped_len;
-        ctxt_lens[i] = buffer_length;
-
-        /*
-        for (int j = 0; j < 32; j++){
-                rv = updatable_update_dek_and_ciphertext(&reuse_session, key_handle, database_keys[i], num_reencrypts);
-        }
-        */
-    } 
+    // If first line of arguments is filled, then we modify starting_key_index and num_of_assigned_keys. 
 
 
     
-    sleep(15);
 
-    //TimerSet (270);
-    TimerSet (150);
 
-    time_t t;
-    srand((unsigned) time(&t));
+    // if Run_Workload is true, Perform full rotation on db
+
     int download_percentage = 50;
     double download_count = 0;
     double upload_count = 0;
 
     
     double thisstart = get_time_in_seconds();
-    while (time_expired == 0) {
-        
-        int db_key_index = total_messages % num_of_db_keys;
-        //int rv = update_dek_key ( &reuse_session, database_keys[db_key_index], key_handle);
-        
-        //rv = updatable_update_dek_and_ciphertext(&reuse_session, key_handle, database_keys[db_key_index], num_reencrypts);
+    for(;;) {
 
-        if (rand() % 100 < download_percentage) {
-            download_count += 1;
-
-            char * received;
-            int length;
-            rv = updatable_download_and_decrypt(&reuse_session, database_keys[db_key_index], &received, &length);
-
-            if (rv == -1) { 
-                redisContext *conn = NULL;
-                //int return_val = init_redis (&conn);
-                set(db_key_wraps[db_key_index], (char*)wraps[db_key_index], wrap_lens[db_key_index], conn);
-                set(db_key_headers[db_key_index], &(ciphertext_hats[db_key_index]), sizeof (ct_hat_data_en), conn);
-                set(db_key_ctxts[db_key_index], ciphertexts[db_key_index], ctxt_lens[db_key_index], conn);
-
-                //close_redis (conn);
-                total_messages -= 1;
+        while (run_workload == 0) {
+            if (end_program == 1) {
+                break;
             }
-            else if (strncmp (reuse_message, received, reuse_message_size) != 0) {
-                printf ("Error with decrypting into original message, not same.\n");
-                //exit(0);
-            }
-
-            // Seems to be old check. dont need anymore i think?
-            // if (length != reuse_message_size && strncmp(received, reuse_message, length) != 0) {
-            //     printf("Failed\n");
-            //     printf("ReuseMessageSize: %d\n", reuse_message_size);
-            //     printf("MessageSize: %d\n", length);
-            //     exit(0);
-            // }
-
-            if (rv != -1) {
-                free(received);
-            }
-
-        } else {
-            upload_count += 1;
-
-            rv = updatable_encrypt_and_upload(&reuse_session, key_handle, database_keys[db_key_index], reuse_message, reuse_message_size, 64);
+            sleep(1);
         }
+    
+        while (run_workload == 1) {
+            int db_key_index = 0;
+            update_ip_addr(db_key_ip_addr[db_key_index]);
+            //int rv = update_dek_key ( &reuse_session, database_keys[db_key_index], key_handle);
             
-        total_messages += 1;
-        if (total_messages % 100 == 0) {
-            printf ("Message # %d\n", total_messages);
+            //rv = updatable_update_dek_and_ciphertext(&reuse_session, key_handle, database_keys[db_key_index], num_reencrypts);
+
+            if (rand() % 100 < download_percentage) {
+                download_count += 1;
+
+                char * received;
+                int length;
+                rv = updatable_download_and_decrypt(&reuse_session, db_key_list[db_key_index], &received, &length);
+
+                // if (rv == -1) { 
+                //     redisContext *conn = NULL;
+                //     //int return_val = init_redis (&conn);
+                //     set(db_key_wraps[db_key_index], (char*)wraps[db_key_index], wrap_lens[db_key_index], conn);
+                //     set(db_key_headers[db_key_index], &(ciphertext_hats[db_key_index]), sizeof (ct_hat_data_en), conn);
+                //     set(db_key_ctxts[db_key_index], ciphertexts[db_key_index], ctxt_lens[db_key_index], conn);
+
+                //     //close_redis (conn);
+                //     total_messages -= 1;
+                // }
+                if (strncmp (reuse_message, received, reuse_message_size) != 0) {
+                    printf ("Error with decrypting into original message, not same.\n");
+                    //exit(0);
+                }
+
+                // Seems to be old check. dont need anymore i think?
+                // if (length != reuse_message_size && strncmp(received, reuse_message, length) != 0) {
+                //     printf("Failed\n");
+                //     printf("ReuseMessageSize: %d\n", reuse_message_size);
+                //     printf("MessageSize: %d\n", length);
+                //     exit(0);
+                // }
+
+                if (rv != -1) {
+                    free(received);
+                }
+
+                printf("DID A DOWNLOAD AND IT WORKED?\n");
+
+            } else {
+                upload_count += 1;
+
+                printf("starting encrypt\n");
+                rv = updatable_encrypt_and_upload(&reuse_session, key_handle, db_key_list[db_key_index], reuse_message, reuse_message_size, 64);
+                printf("DID AN ENCRYPT AND IT WORKED?\n");
+            }
+                
+            total_messages += 1;
+            if (total_messages % 100 == 0) {
+                printf ("Message # %d\n", total_messages);
+            }
         }
 
+
+        double thisend = get_time_in_seconds();
+
+        printf("Download Percent: %f\n", (download_count / (download_count + upload_count)));
+        printf("Upload Percent: %f\n", (upload_count / (download_count + upload_count)));
+
+        printf ("Time passed:   %f\n", (thisend - thisstart));
+        printf ("Num rotations: %d\n", total_messages);
+        printf ("[LOG] latency_final: %f\n\n", (double)(thisend-thisstart) / (double) (total_messages)); 
     }
-    double thisend = get_time_in_seconds();
-
-    printf("Download Percent: %f\n", (download_count / (download_count + upload_count)));
-    printf("Upload Percent: %f\n", (upload_count / (download_count + upload_count)));
-
-    printf ("Time passed:   %f\n", (thisend - thisstart));
-    printf ("Num rotations: %d\n", total_messages);
-    printf ("[LOG] latency_final: %f\n\n", (double)(thisend-thisstart) / (double) (total_messages)); 
-
-    pkcs11_finalize_session(reuse_session);
+    
 
 }
+
+
+
+// int amain (int argc, char** argv) {
+
+//     if (argc < 3) {
+//         printf("Missing Output.txt. Try <../build/src/main/ciphertext_updates_updatable_encryption arguments.txt Output.txt\n");
+//     } else if (argc < 2) {
+//         printf("Missing arguments.txt. Try <../build/src/main/ciphertext_updates_updatable_encryption arguments.txt Output.txt\n");
+//     }
+
+
+//     // Benchmark Numbers
+//     reuse_message_size = 100000;       // 10 KB
+//     reuse_message = malloc(reuse_message_size);
+//     memset(reuse_message, 'a', reuse_message_size);
+
+//     CK_RV rv;
+//     int rc = EXIT_FAILURE;
+    
+//     struct parameters param = {0};
+//     init_params(argv[1], &param);
+
+//     args = param.pkcs_parameters;
+//     ip_addr = param.redis_parameters.ip_addr;
+//     portnum = param.redis_parameters.portnum;
+
+//     // Session Handler Stuff    
+//     int initcount = 0;
+//     rv = pkcs11_initialize(args.library);
+//     while (CKR_OK != rv) {
+//         rv = pkcs11_initialize(args.library);
+
+//         if (initcount > 10) {
+//             printf("FAILED: pkcs11_initialization\n");
+//             return rc;
+//         }
+
+//         initcount += 1;
+//     }
+
+//     rv = pkcs11_open_session(args.pin, &reuse_session);
+//     while (CKR_OK != rv) {
+//         reuse_session = NULL;
+//         rv = pkcs11_open_session(args.pin, &reuse_session);
+
+//         if (initcount > 20) {
+//             printf("FAILED: pkcs11_open_session\n");
+//             return EXIT_FAILURE;
+//         }
+
+//         initcount += 1;
+//         sleep(1);
+//     }
+
+//     // // Generate K_master Key Handle
+//     // for (int i = 0; i < num_keys; i++) {
+//     //     // Initialize Wrapping Key Handle (k-master)
+//     //     generate_new_k_master(&reuse_session, 16, &(key_handle_arr[i]));   
+//     // }
+
+
+//     // HardCode K_master key handle
+//     //key_handle = key_handle_arr[0];
+//     key_handle = 8126470;
+
+
+//     // Get Machine IP address 
+//     char* machine_ip_address  = get_ip_address();
+//     int ip_addr_size = sizeof(machine_ip_address);
+
+//     // Create database_keys space
+//     database_keys = (char**) malloc(sizeof(char*) * (num_of_db_keys));
+//     memset(database_keys, 0, sizeof(char*) * (num_of_db_keys));
+
+//     // Generate num_of_db_keys number of keys into our database_keys datastructure
+//     for (int i=0; i < num_of_db_keys; i++) {
+
+//         database_keys[i] = (char * ) malloc(sizeof(char) * (key_size + ip_addr_size + 12));
+//         memset(database_keys[i], 0, sizeof(char) * (key_size + ip_addr_size + 12));
+
+//         for (int j=0; j < key_size; j++) {
+//             database_keys[i][j]= (char) (97 + ((int)(i / (int)(pow(26,j))) % 26));
+//         }
+
+//         database_keys[i][key_size] = '\0';
+//         strcat(database_keys[i], "_");
+//         strcat(database_keys[i], machine_ip_address);
+//         strcat(database_keys[i], "_");
+//         char tmpstr[10];
+//         memset(tmpstr, 0, 10);
+//         sprintf(tmpstr, "%d", getpid());
+//         strcat(database_keys[i], tmpstr);
+//     }
+
+   
+
+//     db_key_wraps = malloc (num_of_db_keys * sizeof (char*));
+//     db_key_headers = malloc (num_of_db_keys * sizeof (char*));
+//     db_key_ctxts = malloc (num_of_db_keys * sizeof (char*));
+
+//     wraps = malloc (num_of_db_keys * sizeof (CK_BYTE_PTR));
+//     ciphertext_hats = malloc (num_of_db_keys * sizeof (ct_hat_data_en));
+//     ciphertexts = malloc (num_of_db_keys * sizeof (uint8_t*));
+
+
+//     wrap_lens = malloc (num_of_db_keys * sizeof (CK_ULONG));
+//     ctxt_lens = malloc (num_of_db_keys * sizeof (int));
+
+//     // Setup Database with num_of_db_keys number of keys and encrypted messages
+//     for (int i = 0; i < num_of_db_keys; i++) {
+//         //rv = updatable_encrypt_and_upload(&reuse_session, key_handle, database_keys[i], reuse_message, reuse_message_size, 64);
+//         CK_SESSION_HANDLE_PTR session = &reuse_session;
+//         CK_OBJECT_HANDLE wrapping_key_handle = key_handle;
+//         char* ciphertext_id = database_keys[i];
+//         char* message = reuse_message;
+//         int message_length = reuse_message_size;
+//         int total_re_encrypts = 64;
+
+//         // Setup Keys to Lookup Values on Redis Store
+//         char wrap_text[] = "wrap_";
+//         char header_text[] = "header_";
+//         char data_text[] = "data_";
+
+//         char* kv_key_wrap = malloc(strlen(wrap_text) + strlen(ciphertext_id)+1);
+//         char* kv_key_header = malloc(strlen(header_text) + strlen(ciphertext_id)+1);
+//         char* kv_key_data = malloc(strlen(data_text) + strlen(ciphertext_id)+1);
+//         kv_key_wrap[0] = '\0';
+//         kv_key_header[0] = '\0';
+//         kv_key_data[0] = '\0';
+
+//         strcat(kv_key_wrap, wrap_text);
+//         strcat(kv_key_wrap, ciphertext_id);
+//         strcat(kv_key_header, header_text);
+//         strcat(kv_key_header, ciphertext_id);
+//         strcat(kv_key_data, data_text);
+//         strcat(kv_key_data, ciphertext_id);
+
+//         // Encrypt Data using Updatable Encryption
+//         AE_key ae_key[64];
+//         for (int j = 0; j < 64; j++) {
+//             AE_KeyGen( & (ae_key[j]), total_re_encrypts);
+//         }
+
+//         ct_hat_data_en ciphertext_hat;
+//         int buffer_length = sizeof(AE_ctx_header) + message_length + total_re_encrypts * (2 * RHO + NU);
+//         uint8_t * ciphertext = (uint8_t * ) malloc(buffer_length);
+//         uint8_t * ciphertext2 = (uint8_t * ) malloc(buffer_length);
+
+//         int ctx_length = AE_Encrypt(&ae_key, message, &ciphertext_hat, ciphertext, message_length);
+//         //printf ("buffer_length = %d\n", buffer_length);
+//         //printf ("ctx_length 1 = %d\n", ctx_length);
+
+//         int reencrypt_count = 64;
+//         for (int j = 0; j < reencrypt_count; j++) {
+//             AE_key* ae_key1 = & (ae_key[j]);
+//             AE_key* ae_key2 = & (ae_key[j+1]);
+            
+//             delta_token_data delta;
+//             int token_work = AE_ReKeyGen(ae_key1, ae_key2, &ciphertext_hat, &delta);
+
+//             ct_hat_data_en ciphertext_hat2;
+//             ctx_length = AE_ReEncrypt(&delta, &ciphertext_hat, ciphertext, &ciphertext_hat2, ciphertext2, buffer_length-32);
+//             ciphertext_hat = ciphertext_hat2;
+//             memcpy (ciphertext, ciphertext2, buffer_length);
+//             //printf ("ctx_length = %d\n", ctx_length);
+
+//         }   
+
+//         free (ciphertext2);
+//         CK_RV rv;
+
+//         // Wrap the Decryption Key  
+//         CK_BYTE_PTR wrapped_key = NULL;
+//         CK_ULONG wrapped_len = 0;
+
+//         rv = hsm_aes_encrypt(*session, wrapping_key_handle, &(ae_key[reencrypt_count]), sizeof(AE_key), &wrapped_key, &wrapped_len);
+        
+//         if (rv != CKR_OK) {
+//             printf("HSM Aes Encrypt Failed\n");
+//             free(wrapped_key);
+//             free(kv_key_wrap);
+//                 free(kv_key_data);
+//                 exit(1);
+//         }
+
+//         /* Upload Header and Ciphertext (no wrap yet) */
+//         redisContext *conn = NULL;
+//         //int return_val = init_redis (&conn);
+//         set(kv_key_wrap, (char*)wrapped_key, wrapped_len, conn);
+//         set(kv_key_header, &ciphertext_hat, sizeof (ct_hat_data_en), conn);
+//         set(kv_key_data, ciphertext, buffer_length, conn);
+
+//         //close_redis (conn);
+
+//         db_key_wraps[i] = kv_key_wrap;
+//         db_key_headers[i] = kv_key_header;
+//         db_key_ctxts[i] = kv_key_data;
+//         //memcpy (db_key_wraps[i], kv_key_wrap, strlen(kv_key_wrap));
+//         //memcpy (db_key_headers[i], kv_key_header, strlen(kv_key_header));
+//         //memcpy (db_key_ctxts[i], kv_key_data, strlen(kv_key_data));
+
+//         wraps[i] = wrapped_key;
+//         //memcpy (wraps[i], wrapped_key, sizeof (CK_BYTE_PTR));
+//         ciphertext_hats[i] = ciphertext_hat;
+//         ciphertexts[i] = ciphertext;
+//         //memcpy (ciphertexts[i], ciphertext, sizeof (uint8_t *));
+
+//         wrap_lens[i] = wrapped_len;
+//         ctxt_lens[i] = buffer_length;
+
+//         /*
+//         for (int j = 0; j < 32; j++){
+//                 rv = updatable_update_dek_and_ciphertext(&reuse_session, key_handle, database_keys[i], num_reencrypts);
+//         }
+//         */
+//     } 
+
+
+    
+//     sleep(15);
+
+//     //TimerSet (270);
+//     TimerSet (150);
+
+//     time_t t;
+//     srand((unsigned) time(&t));
+//     int download_percentage = 50;
+//     double download_count = 0;
+//     double upload_count = 0;
+
+    
+//     double thisstart = get_time_in_seconds();
+//     while (time_expired == 0) {
+        
+//         int db_key_index = total_messages % num_of_db_keys;
+//         //int rv = update_dek_key ( &reuse_session, database_keys[db_key_index], key_handle);
+        
+//         //rv = updatable_update_dek_and_ciphertext(&reuse_session, key_handle, database_keys[db_key_index], num_reencrypts);
+
+//         if (rand() % 100 < download_percentage) {
+//             download_count += 1;
+
+//             char * received;
+//             int length;
+//             rv = updatable_download_and_decrypt(&reuse_session, database_keys[db_key_index], &received, &length);
+
+//             if (rv == -1) { 
+//                 redisContext *conn = NULL;
+//                 //int return_val = init_redis (&conn);
+//                 set(db_key_wraps[db_key_index], (char*)wraps[db_key_index], wrap_lens[db_key_index], conn);
+//                 set(db_key_headers[db_key_index], &(ciphertext_hats[db_key_index]), sizeof (ct_hat_data_en), conn);
+//                 set(db_key_ctxts[db_key_index], ciphertexts[db_key_index], ctxt_lens[db_key_index], conn);
+
+//                 //close_redis (conn);
+//                 total_messages -= 1;
+//             }
+//             else if (strncmp (reuse_message, received, reuse_message_size) != 0) {
+//                 printf ("Error with decrypting into original message, not same.\n");
+//                 //exit(0);
+//             }
+
+//             // Seems to be old check. dont need anymore i think?
+//             // if (length != reuse_message_size && strncmp(received, reuse_message, length) != 0) {
+//             //     printf("Failed\n");
+//             //     printf("ReuseMessageSize: %d\n", reuse_message_size);
+//             //     printf("MessageSize: %d\n", length);
+//             //     exit(0);
+//             // }
+
+//             if (rv != -1) {
+//                 free(received);
+//             }
+
+//         } else {
+//             upload_count += 1;
+
+//             rv = updatable_encrypt_and_upload(&reuse_session, key_handle, database_keys[db_key_index], reuse_message, reuse_message_size, 64);
+//         }
+            
+//         total_messages += 1;
+//         if (total_messages % 100 == 0) {
+//             printf ("Message # %d\n", total_messages);
+//         }
+
+//     }
+//     double thisend = get_time_in_seconds();
+
+//     printf("Download Percent: %f\n", (download_count / (download_count + upload_count)));
+//     printf("Upload Percent: %f\n", (upload_count / (download_count + upload_count)));
+
+//     printf ("Time passed:   %f\n", (thisend - thisstart));
+//     printf ("Num rotations: %d\n", total_messages);
+//     printf ("[LOG] latency_final: %f\n\n", (double)(thisend-thisstart) / (double) (total_messages)); 
+
+//     pkcs11_finalize_session(reuse_session);
+
+// }
