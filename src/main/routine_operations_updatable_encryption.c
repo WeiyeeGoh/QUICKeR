@@ -240,6 +240,8 @@ int main (int argc, char** argv) {
         printf("Server listening on port %d..\n", PORT);
     }
 
+    printf("DONE DONE DONE\n");
+
     pthread_t thread_id;
     pthread_create(&thread_id, NULL, commandListener, (void*)&sockfd);
     ///////////////END/////////////////////

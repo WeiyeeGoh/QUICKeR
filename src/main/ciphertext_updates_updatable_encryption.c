@@ -371,7 +371,6 @@ int main (int argc, char** argv) {
         } else {
             printf("Command is not recognized!\n");
             printf("COMMAND: %.5s\n", command);
-            exit(0);
         }
 
 

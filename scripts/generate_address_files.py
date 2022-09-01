@@ -12,13 +12,33 @@ import subprocess
 private_key_pem = "../../.ssh/lawrence-ucsb-test-1.pem"
 
 
+# def wait_instance_until_resady(instance_id):
+#     ec2_c = boto3.client('ec2')
+#     instance_state = "";
+#     while(instance_state != "enabled"):
+#         response = ec2_c.monitor_instances(InstanceIds=[instance_id])
+#         instance_state = response['InstanceMonitorings'][0]['Monitoring']['State']
+#         print(response['InstanceMonitorings'][0]['Monitoring']['State'])
+#         #print(response)
+#         time.sleep(1)
+
 def wait_instance_until_resady(instance_id):
-    ec2_c = boto3.client('ec2')
-    instance_state = "";
-    while(instance_state != "enabled"):
-        response = ec2_c.monitor_instances(InstanceIds=[instance_id])
-        instance_state = response['InstanceMonitorings'][0]['Monitoring']['State']
-        print(response['InstanceMonitorings'][0]['Monitoring']['State'])
+    ec2_r = boto3.resource('ec2', region_name="us-east-2")
+    instance_state = ""
+    while(instance_state != "running"):
+        instance = ec2_r.Instance(instance_id)
+        instance_state = instance.state['Name']
+        print("%s: %s" %(instance_id, instance_state))
+        #print(response)
+        time.sleep(1)
+
+def wait_instance_until_stopped(instance_id):
+    ec2_r = boto3.resource('ec2', region_name="us-east-2")
+    instance_state = ""
+    while(instance_state != "stopped"):
+        instance = ec2_r.Instance(instance_id)
+        instance_state = instance.state['Name']
+        print("%s: %s" %(instance_id, instance_state))
         #print(response)
         time.sleep(1)
 
@@ -39,6 +59,8 @@ def call_to_instance(ip_address, command, command_type=None):
     
 
     if command_type == "setup":
+        pass
+    elif command_type == "start_db":
         pass
     else:
         print(stdout.read())
@@ -62,6 +84,15 @@ def send_file_to_instance(ip_address, filename, remoteFilePath):
  
 
 
+#########TESTETSTES
+
+# call_to_instance("172.31.21.136", "python3 startup_redis_script.py", "start_db")
+
+# exit(0)
+
+
+##########TESTETSTEETSTE
+
 
 
 
@@ -72,11 +103,12 @@ ec2 = boto3.resource('ec2', region_name=region)
 ec2_client = boto3.client('ec2', region_name=region)
 
 
+
 #######GET STOPPED CLIENT MACHINES################
 stopped_client_machines = ec2_client.describe_instances(Filters=[
     {
         'Name': 'instance-state-name',
-        'Values': ['running']
+        'Values': ['stopped']
     },
     {
         'Name': 'tag:Client_Type',
@@ -101,7 +133,7 @@ print("total: %d\n" %(total))
 stopped_db_machines = ec2_client.describe_instances(Filters=[
     {
         'Name': 'instance-state-name',
-        'Values': ['running']
+        'Values': ['stopped']
     },
     {
         'Name': 'tag:Type',
@@ -123,61 +155,86 @@ for res in stuff:
 print("total: %d\n" %(total))
 
 
-######### STARTING INSTANCE STUFF
-# #### Start Up all the client instances
-# thread_list = []
-# for stopped_client in stopped_client_list:
-#     try:
-#         response = ec2_client.start_instances(InstanceIds=[stopped_client], DryRun=False)
-#         print(response)
+######## STARTING INSTANCE STUFF
+#### Start Up all the client instances
+print("Starting up all the instances\n")
+thread_list = []
+for stopped_client in stopped_client_list:
+    try:
+        response = ec2_client.start_instances(InstanceIds=[stopped_client], DryRun=False)
+        #print(response)
 
-#         x = threading.Thread(target=wait_instance_until_resady, args=(stopped_client,))
-#         x.start()
-#         thread_list.append(x)
-#     except ClientError as e:
-#         print(e)
+        x = threading.Thread(target=wait_instance_until_resady, args=(stopped_client,))
+        x.start()
+        thread_list.append(x)
+    except Exception as e:
+        print(e)
 
-# #### Start up all the stopped db instances
-# for stopped_db in stopped_db_list:
-#     try:
-#         response = ec2_client.start_instances(InstanceIds=[stopped_db], DryRun=False)
-#         print(response)
+#### Start up all the stopped db instances
+for stopped_db in stopped_db_list:
+    try:
+        response = ec2_client.start_instances(InstanceIds=[stopped_db], DryRun=False)
+        #print(response)
 
-#         x = threading.Thread(target=wait_instance_until_resady, args=(stopped_db,))
-#         x.start()
-#         thread_list.append(x)
-#     except ClientError as e:
-#         print(e)
+        x = threading.Thread(target=wait_instance_until_resady, args=(stopped_db,))
+        x.start()
+        thread_list.append(x)
+    except Exception as e:
+        print(e)
 
-# # Wait for them all to join up
-# for thread in thread_list:
-#     thread.join()
+# Wait for them all to join up
+for thread in thread_list:
+    thread.join()
+
+started_client_list = stopped_client_list
+started_db_list = stopped_db_list
+print("All instances are up and running\n")
 
 
-# #### Startup Redis on each of the db
-# for private_db_address in db_priv_ip_addr:
-#     call_to_instance(private_db_address, "python3 startup_redis_script.py")
+#### Startup Redis on each of the db (and write to db_address.txt file)
+print("Startup database program on db servers\n")
+f = open("db_address.txt", "w")
+print(db_priv_ip_addr)
+for i in range(len(db_priv_ip_addr)):
+    private_db_address = db_priv_ip_addr[i]
+    print("starting: %s\n", private_db_address)
+    call_to_instance(private_db_address, "python3 startup_redis_script.py", "start_db")
+    f.write(private_db_address + " " + str(5000) + "\n")
+    # if i != len(db_priv_ip_addr) - 1:
+    #     f.write("\n")
+
+for i in range(10):
+    print("time: %d" %i)
+    time.sleep(1)
+f.close()
+print("Done with database startup\n")
 
 
-# # TODO unhardcode
-# print("STARTING STUFF HERE\n")
-# cmd = "cd QUICKeR/scripts; python3 setup_client.py 172.31.14.183"
-# setup_thread_list = []
 
-# for i in range(len(client_priv_ip_addr)):
-#     ip_address = client_priv_ip_addr[i]
-#     print(ip_address)
-#     thread = threading.Thread(target=call_to_instance, args=(ip_address,cmd, "setup"))
+# TODO unhardcode
+print("perform setup on client instances\n")
+cmd = "cd QUICKeR/scripts; python3 setup_client.py 172.31.14.183"
+setup_thread_list = []
 
-#     setup_thread_list.append(thread)
-#     thread.start()
+for i in range(len(client_priv_ip_addr)):
+    ip_address = client_priv_ip_addr[i]
+    print(ip_address)
+    thread = threading.Thread(target=call_to_instance, args=(ip_address,cmd, "setup"))
 
-# for thread in setup_thread_list:
-#     thread.join()
+    setup_thread_list.append(thread)
+    thread.start()
 
+for thread in setup_thread_list:
+    thread.join()
+print("Setup on Client Instances is DONE\n")
+
+
+print("Wait 10 seconds\n")
+time.sleep(10)
 
 
 #########Run Commands to Start client and update machines
+print("Startup client and update machines program\n")
 date = datetime.datetime.now()
 date_formatted = date.strftime("%y-%m-%d-%X")
 logname = "logs/" + date_formatted + "_logs.txt"
@@ -217,39 +274,125 @@ for i in range(len(experiment_names)):
 
     for j in range(test_count):
         arg_file_content = arg_file[0] + arg_file[1] + str(portnum + index) + "\n" + arg_file[3] + arg_file[4]
-        print(arg_file_content)
+        ##print(arg_file_content)
         cmd = " cd QUICKeR/scripts;"
         cmd += " echo $'" + arg_file[0] + arg_file[1] + str(portnum + index) + "\n" + arg_file[3] + arg_file[4] + "' > arguments.txt; "
         cmd += " python3 run_client.py " + test_name + " " + logname
-        print(cmd)
+        ##print(cmd)
+        command_list.append(cmd)
 
         addr_fd.write(client_priv_ip_addr[index] + " " + str(machine_port) + "\n")
         index += 1
 
     addr_fd.close()
 
-# for i in range(len(command_list)):
-#     cmd = command_list[i]
-#     ip_address = client_priv_ip_addr[i]
-#     print(ip_address)
-#     thread = threading.Thread(target=call_to_instance, args=(ip_address,cmd, "run"))
+print(command_list)
+for i in range(len(command_list)):
+    cmd = command_list[i]
+    ip_address = client_priv_ip_addr[i]
+    print(ip_address)
+    thread = threading.Thread(target=call_to_instance, args=(ip_address,cmd, "run"))
 
-#     setup_thread_list.append(thread)
-#     thread.start()
+    setup_thread_list.append(thread)
+    thread.start()
 
-# for thread in setup_thread_list:
+for thread in setup_thread_list:
+    thread.join()
+
+
+
+
+
+
+
+
+
+# ######### STOP all client machines
+# # Dry run succeeded, call stop_instances without dryrun
+# stopping_thread_list = []
+# for client_name in started_client_list:
+#     try:
+#         response = ec2_client.stop_instances(InstanceIds=[client_name], DryRun=False)
+#         x = threading.Thread(target=wait_instance_until_stopped, args=(client_name,))
+#         x.start()
+#         stopping_thread_list.append(x)
+#     except Exception as e:
+#         print(e)
+# for client_name in started_db_list:
+#     try:
+#         response = ec2_client.stop_instances(InstanceIds=[client_name], DryRun=False)
+#         x = threading.Thread(target=wait_instance_until_stopped, args=(client_name,))
+#         x.start()
+#         stopping_thread_list.append(x)
+#     except Exception as e:
+#         print(e)
+
+# for thread in stopping_thread_list:
 #     thread.join()
+# print("All db and clients have been stopped\n")
+
+
+# print("aggregate log with %s", output_logname);
+######### Stop all db machines
+
+exit(0)
 
 
 
 
-# ######### Populate DB HERE
-# subprocess.run(["../build/src/main/populate_database_updatable", "arguments.txt", "db_address.txt"])
 
 
-# ######### Run Round Coord Here
-# subprocess.run(["../build/src/main/update_round_coordinator", "client_machines_address.txt", "update_machines_address.txt", "db_address.txt"])
 
+
+
+
+
+
+
+
+
+
+######### Populate DB HERE
+print("Perform populate db\n")
+subprocess.run(["../build/src/main/populate_database_updatable", "arguments.txt", "db_address.txt"])
+
+
+######### Run Round Coord Here
+print("Perform round coordinator\n")
+subprocess.run(["../build/src/main/update_round_coordinator", "client_machines_address.txt", "update_machines_address.txt", "db_address.txt"])
+
+
+
+###### TODO: Add aggregation here. Then do something to append it into a local file???
+
+
+######### STOP all client machines
+# Dry run succeeded, call stop_instances without dryrun
+stopping_thread_list = []
+for client_name in started_client_list:
+    try:
+        response = ec2_client.stop_instances(InstanceIds=[client_name], DryRun=False)
+        x = threading.Thread(target=wait_instance_until_stopped, args=(client_name,))
+        x.start()
+        stopping_thread_list.append(x)
+    except Exception as e:
+        print(e)
+for client_name in started_db_list:
+    try:
+        response = ec2_client.stop_instances(InstanceIds=[client_name], DryRun=False)
+        x = threading.Thread(target=wait_instance_until_stopped, args=(client_name,))
+        x.start()
+        stopping_thread_list.append(x)
+    except Exception as e:
+        print(e)
+
+for thread in stopping_thread_list:
+    thread.join()
+print("All db and clients have been stopped\n")
+
+
+print("aggregate log with %s", output_logname);
+######### Stop all db machines
 
 
 exit(0)
@@ -259,7 +402,7 @@ exit(0)
 ###########REMOVE################
 # try:
 #     ec2_client.start_instances(InstanceIds=["i-00175a642f594c0b5"], DryRun=True)
-# except ClientError as e:
+# except Exception as e:
 #     if 'DryRunOperation' not in str(e):
 #         raise
 ## Dry run succeeded, run start_instances without dryrun
