@@ -43,7 +43,7 @@ def wait_instance_until_stopped(instance_id):
         time.sleep(1)
 
 
-def call_to_instance(ip_address, command, command_type=None):
+def call_to_instance(ip_address, command, command_type=None, logname=None, test_name=None):
     print("connecting to %s" %(ip_address))
 
     key = paramiko.RSAKey.from_private_key_file(private_key_pem)
@@ -59,9 +59,25 @@ def call_to_instance(ip_address, command, command_type=None):
     
 
     if command_type == "setup":
-        stdout.read()
+        print(stdout.read())
+        #pass
     elif command_type == "start_db":
         pass
+    elif command_type == "run":
+        pass
+    elif command_type == "aggregate":
+        # make log directory to aggregate all the log files
+        if not os.path.exists(logname):
+            os.mkdir(logname)
+
+        path = logname+'/'+test_name
+        if not os.path.exists(path):
+            os.mkdir(path)
+
+        f = open(path + "/" + ip_address + "_log.txt", "w")
+        log_output = stdout.read().decode('ascii').strip("\n")
+        f.write(log_output)
+        f.close()
     else:
         print(stdout.read())
 
@@ -83,133 +99,6 @@ def send_file_to_instance(ip_address, filename, remoteFilePath):
     client.close()
  
 
-
-#########TESTETSTES
-
-all_ip_addresses = []
-region = "us-east-2"
-ec2 = boto3.resource('ec2', region_name=region)
-ec2_client = boto3.client('ec2', region_name=region)
-
-#######GET STOPPED CLIENT MACHINES################
-# stopped_client_machines = ec2_client.describe_instances(Filters=[
-#     {
-#         'Name': 'instance-state-name',
-#         'Values': ['running']
-#     },
-#     {
-#         'Name': 'tag:Client_Type',
-#         'Values': ['Client_Test']
-#     }
-# ])
-# stuff = stopped_client_machines['Reservations']
-# total =0
-# stopped_client_list = []
-# client_priv_ip_addr = []
-# for res in stuff:
-#     print(len(res["Instances"]))
-#     for i in range(len(res["Instances"])):
-#         print(res["Instances"][i]['InstanceId'])
-#         print(res["Instances"][i]['PrivateIpAddress'])
-#         total += 1
-#         stopped_client_list.append(res["Instances"][i]['InstanceId'])
-#         client_priv_ip_addr.append(res["Instances"][i]['PrivateIpAddress'])
-# print("total: %d\n" %(total))
-
-
-
-
-# print("perform setup on client instances\n")
-# cmd = "cd QUICKeR/scripts; python3 setup_client.py 172.31.14.183; cd ../.."
-# setup_thread_list = []
-
-# for i in range(len(client_priv_ip_addr)):
-#     ip_address = client_priv_ip_addr[i]
-#     print(ip_address)
-#     thread = threading.Thread(target=call_to_instance, args=(ip_address,cmd, "setup"))
-
-#     setup_thread_list.append(thread)
-#     thread.start()
-
-# for thread in setup_thread_list:
-#     thread.join()
-# print("Setup on Client Instances is DONE\n")
-
-
-# print("Wait 10 seconds\n")
-# time.sleep(15)
-
-
-
-# #########Run Commands to Start client and update machines
-# print("Startup client and update machines program\n")
-# date = datetime.datetime.now()
-# date_formatted = date.strftime("%y-%m-%d-%X")
-# logname = "logs/" + date_formatted + "_logs.txt"
-# output_logname = "logs/" + date_formatted + "_logs"
-
-# f = open("experiment_parameters.txt", "r")
-# experiment_names = []
-# experiment_count = []
-# for line in f.readlines():
-#     line_split = line.split(" ")
-#     experiment_names.append(line_split[0])
-#     experiment_count.append(line_split[1])
-# f.close()
-
-# f = open("arguments.txt", "r")
-# arg_file = []
-# for line in f.readlines():
-#     arg_file.append(line)
-# f.close()
-
-# command_list = []
-# portnum = 5000
-# index = 0
-# for i in range(len(experiment_names)):
-#     test_name = experiment_names[i]
-#     test_count = int(experiment_count[i])
-
-#     machine_port = 6000
-#     if (experiment_names[i] == "routine_operations_updatable_encryption"):
-#         addr_fd = open("client_machines_address.txt", "w")
-#         machine_port = 6000
-#     elif (experiment_names[i] == "ciphertext_updates_updatable_encryption"):
-#         addr_fd = open("update_machines_address.txt", "w")
-#         machine_port = 7000
-#     else:
-#         print("Unknown Experiment?? %s\n", experiment_names[i])
-
-#     for j in range(test_count):
-#         arg_file_content = arg_file[0] + arg_file[1] + str(portnum + index) + "\n" + arg_file[3] + arg_file[4]
-#         ##print(arg_file_content)
-#         cmd = " cd QUICKeR/scripts;"
-#         cmd += " echo $'" + arg_file[0] + arg_file[1] + str(portnum + index) + "\n" + arg_file[3] + arg_file[4] + "' > arguments.txt; "
-#         cmd += " python3 run_client.py " + test_name + " " + logname
-#         print(cmd)
-#         command_list.append(cmd)
-
-#         addr_fd.write(client_priv_ip_addr[index] + " " + str(machine_port) + "\n")
-#         index += 1
-
-#     addr_fd.close()
-
-# print(command_list)
-# setup_thread_list = []
-# for i in range(len(command_list)):
-#     cmd = command_list[i]
-#     ip_address = client_priv_ip_addr[i]
-#     print(ip_address)
-#     thread = threading.Thread(target=call_to_instance, args=(ip_address,cmd, "run"))
-
-#     setup_thread_list.append(thread)
-#     thread.start()
-
-# for thread in setup_thread_list:
-#     thread.join()
-
-# exit(0)
-##########TESTETSTEETSTE
 
 
 
@@ -321,7 +210,7 @@ for i in range(len(db_priv_ip_addr)):
     # if i != len(db_priv_ip_addr) - 1:
     #     f.write("\n")
 
-for i in range(5):
+for i in range(30):
     print("time: %d" %i)
     time.sleep(1)
 f.close()
@@ -484,7 +373,31 @@ subprocess.run(["../build/src/main/update_round_coordinator", "client_machines_a
 
 
 
-###### TODO: Add aggregation here. Then do something to append it into a local file???
+aggregate_thread_list = []
+print("aggregate log with %s", output_logname)
+f = open("experiment_parameters.txt", "r")
+command_list = []
+all_test_names = []
+for line in f.readlines():
+    line_split = line.split(" ")
+    test_name = line_split[0]
+    test_count = int(line_split[1])
+    all_test_names.append(test_name)
+
+    cmd = "cd QUICKeR/scripts; cat arguments.txt; cat " + output_logname + ".txt"
+    command_list += [(test_name, cmd)] * test_count
+for i in range(len(client_priv_ip_addr)):
+    ip_address = client_priv_ip_addr[i]
+    cmd = command_list[i][1]
+    test_name = command_list[i][0]
+    print(ip_address)
+    thread = threading.Thread(target=call_to_instance, args=(ip_address,cmd, "aggregate", output_logname, test_name))
+
+    aggregate_thread_list.append(thread)
+    thread.start()
+
+for thread in aggregate_thread_list: 
+    thread.join()
 
 
 ######### STOP all client machines
@@ -512,8 +425,14 @@ for thread in stopping_thread_list:
 print("All db and clients have been stopped\n")
 
 
-print("aggregate log with %s", output_logname);
-######### Stop all db machines
+
+
+
+
+print("aggregate log with %s", output_logname)
+for i in range(len(all_test_names)):
+    print("log directory:  %s", output_logname + "/" + all_test_names[i])
+#print("aggregate log with %s", output_logname)
 
 
 exit(0)
