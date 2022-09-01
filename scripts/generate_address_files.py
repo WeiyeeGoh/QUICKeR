@@ -197,6 +197,7 @@ started_client_list = stopped_client_list
 started_db_list = stopped_db_list
 print("All instances are up and running\n")
 
+exit(0)
 
 
 #### Startup Redis on each of the db (and write to db_address.txt file)
