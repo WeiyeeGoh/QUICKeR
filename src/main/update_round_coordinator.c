@@ -262,13 +262,13 @@ int main(int argc, char** argv) {
     // 1) Choose a Root key
     
     int total_rounds = 1;
-
+    redisContext *conn = NULL;
     for (int round=0; round < total_rounds; round++) {
 
         key_handle = key_handle_arr[round % 3];
 
         // Notify new root key to db. Db saves new root key. 
-        redisContext *conn = NULL;
+        conn = NULL;
         for (int i=0; i < db_count; i++) {
             // printf("SENDing new root key to db\n");
             // printf("Ip Address: %s\n", db_address[i]);
@@ -335,6 +335,15 @@ int main(int argc, char** argv) {
         }
         printf("DONE notifying clients to end\n");
     }
+
+    printf("Tell Client machines to end process\n");
+    for(int i=0; i < client_machine_count; i++) {
+        conn = NULL;
+        int sockfd = connect_to_server(client_machines_address[i], client_machines_port[i]);    
+        send_client_end(sockfd);
+        close (sockfd);
+    }
+    printf("DONE notifying clients to end\n");
 
     printf("COMPETED ALL MY ROUNDS (%d)\n", total_rounds);
 

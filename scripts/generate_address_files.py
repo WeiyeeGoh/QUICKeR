@@ -59,7 +59,7 @@ def call_to_instance(ip_address, command, command_type=None):
     
 
     if command_type == "setup":
-        pass
+        stdout.read()
     elif command_type == "start_db":
         pass
     else:
@@ -86,11 +86,129 @@ def send_file_to_instance(ip_address, filename, remoteFilePath):
 
 #########TESTETSTES
 
-# call_to_instance("172.31.21.136", "python3 startup_redis_script.py", "start_db")
+all_ip_addresses = []
+region = "us-east-2"
+ec2 = boto3.resource('ec2', region_name=region)
+ec2_client = boto3.client('ec2', region_name=region)
+
+#######GET STOPPED CLIENT MACHINES################
+# stopped_client_machines = ec2_client.describe_instances(Filters=[
+#     {
+#         'Name': 'instance-state-name',
+#         'Values': ['running']
+#     },
+#     {
+#         'Name': 'tag:Client_Type',
+#         'Values': ['Client_Test']
+#     }
+# ])
+# stuff = stopped_client_machines['Reservations']
+# total =0
+# stopped_client_list = []
+# client_priv_ip_addr = []
+# for res in stuff:
+#     print(len(res["Instances"]))
+#     for i in range(len(res["Instances"])):
+#         print(res["Instances"][i]['InstanceId'])
+#         print(res["Instances"][i]['PrivateIpAddress'])
+#         total += 1
+#         stopped_client_list.append(res["Instances"][i]['InstanceId'])
+#         client_priv_ip_addr.append(res["Instances"][i]['PrivateIpAddress'])
+# print("total: %d\n" %(total))
+
+
+
+
+# print("perform setup on client instances\n")
+# cmd = "cd QUICKeR/scripts; python3 setup_client.py 172.31.14.183; cd ../.."
+# setup_thread_list = []
+
+# for i in range(len(client_priv_ip_addr)):
+#     ip_address = client_priv_ip_addr[i]
+#     print(ip_address)
+#     thread = threading.Thread(target=call_to_instance, args=(ip_address,cmd, "setup"))
+
+#     setup_thread_list.append(thread)
+#     thread.start()
+
+# for thread in setup_thread_list:
+#     thread.join()
+# print("Setup on Client Instances is DONE\n")
+
+
+# print("Wait 10 seconds\n")
+# time.sleep(15)
+
+
+
+# #########Run Commands to Start client and update machines
+# print("Startup client and update machines program\n")
+# date = datetime.datetime.now()
+# date_formatted = date.strftime("%y-%m-%d-%X")
+# logname = "logs/" + date_formatted + "_logs.txt"
+# output_logname = "logs/" + date_formatted + "_logs"
+
+# f = open("experiment_parameters.txt", "r")
+# experiment_names = []
+# experiment_count = []
+# for line in f.readlines():
+#     line_split = line.split(" ")
+#     experiment_names.append(line_split[0])
+#     experiment_count.append(line_split[1])
+# f.close()
+
+# f = open("arguments.txt", "r")
+# arg_file = []
+# for line in f.readlines():
+#     arg_file.append(line)
+# f.close()
+
+# command_list = []
+# portnum = 5000
+# index = 0
+# for i in range(len(experiment_names)):
+#     test_name = experiment_names[i]
+#     test_count = int(experiment_count[i])
+
+#     machine_port = 6000
+#     if (experiment_names[i] == "routine_operations_updatable_encryption"):
+#         addr_fd = open("client_machines_address.txt", "w")
+#         machine_port = 6000
+#     elif (experiment_names[i] == "ciphertext_updates_updatable_encryption"):
+#         addr_fd = open("update_machines_address.txt", "w")
+#         machine_port = 7000
+#     else:
+#         print("Unknown Experiment?? %s\n", experiment_names[i])
+
+#     for j in range(test_count):
+#         arg_file_content = arg_file[0] + arg_file[1] + str(portnum + index) + "\n" + arg_file[3] + arg_file[4]
+#         ##print(arg_file_content)
+#         cmd = " cd QUICKeR/scripts;"
+#         cmd += " echo $'" + arg_file[0] + arg_file[1] + str(portnum + index) + "\n" + arg_file[3] + arg_file[4] + "' > arguments.txt; "
+#         cmd += " python3 run_client.py " + test_name + " " + logname
+#         print(cmd)
+#         command_list.append(cmd)
+
+#         addr_fd.write(client_priv_ip_addr[index] + " " + str(machine_port) + "\n")
+#         index += 1
+
+#     addr_fd.close()
+
+# print(command_list)
+# setup_thread_list = []
+# for i in range(len(command_list)):
+#     cmd = command_list[i]
+#     ip_address = client_priv_ip_addr[i]
+#     print(ip_address)
+#     thread = threading.Thread(target=call_to_instance, args=(ip_address,cmd, "run"))
+
+#     setup_thread_list.append(thread)
+#     thread.start()
+
+# for thread in setup_thread_list:
+#     thread.join()
 
 # exit(0)
-
-
 ##########TESTETSTEETSTE
 
 
@@ -203,7 +321,7 @@ for i in range(len(db_priv_ip_addr)):
     # if i != len(db_priv_ip_addr) - 1:
     #     f.write("\n")
 
-for i in range(10):
+for i in range(5):
     print("time: %d" %i)
     time.sleep(1)
 f.close()
@@ -230,7 +348,7 @@ print("Setup on Client Instances is DONE\n")
 
 
 print("Wait 10 seconds\n")
-time.sleep(10)
+time.sleep(15)
 
 
 #########Run Commands to Start client and update machines
@@ -335,7 +453,7 @@ for thread in setup_thread_list:
 # print("aggregate log with %s", output_logname);
 ######### Stop all db machines
 
-exit(0)
+# exit(0)
 
 
 
@@ -355,6 +473,9 @@ exit(0)
 ######### Populate DB HERE
 print("Perform populate db\n")
 subprocess.run(["../build/src/main/populate_database_updatable", "arguments.txt", "db_address.txt"])
+
+for client_ip_addr in client_priv_ip_addr:
+    send_file_to_instance(client_ip_addr, "Output.txt", "./QUICKeR/scripts/Output.txt")
 
 
 ######### Run Round Coord Here
@@ -416,7 +537,7 @@ exit(0)
 # TODO Populate DB Command here
 
 # ip_address = "3.136.158.29"
-# send_file_to_instance(ip_address, "Output.txt", "./QUICKeR/scripts/Output.txt")
+#send_file_to_instance(ip_address, "Output.txt", "./QUICKeR/scripts/Output.txt")
 
 # Run Round Coordinator
 
