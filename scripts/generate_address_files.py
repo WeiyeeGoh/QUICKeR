@@ -198,6 +198,7 @@ started_db_list = stopped_db_list
 print("All instances are up and running\n")
 
 
+
 #### Startup Redis on each of the db (and write to db_address.txt file)
 print("Startup database program on db servers\n")
 f = open("db_address.txt", "w")
