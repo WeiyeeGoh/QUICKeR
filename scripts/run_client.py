@@ -15,7 +15,7 @@ def run_experiment(logname):
 
   test_name = sys.argv[1]
 
-  cmd = '../build/src/main/' + test_name + ' arguments.txt > ' + logname
+  cmd = '../build/src/main/' + test_name + ' arguments.txt Output.txt > ' + logname
   print(cmd)
   run_local_task(cmd)
     

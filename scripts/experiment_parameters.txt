@@ -1,2 +1,2 @@
-ciphertext_updates_naive 14
-routine_operations_naive 24
+routine_operations_updatable_encryption 3
+ciphertext_updates_updatable_encryption 3

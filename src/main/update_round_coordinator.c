@@ -318,8 +318,8 @@ int main(int argc, char** argv) {
             pthread_create(&tid[i], NULL, send_start, sockfd);
         }
         for (int i =0; i < update_machine_count; i++) {
-            pthread_join(tid[i], NULL);
             close(sockfd_arr[i]);
+            pthread_join(tid[i], NULL);
         }
         free(tid);
         free(sockfd_arr);

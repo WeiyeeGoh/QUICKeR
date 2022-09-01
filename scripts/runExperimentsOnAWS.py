@@ -7,6 +7,7 @@ import time
 import datetime
 import os
 
+
 # OLD REDIS MACHINE
 #argument_files = ["172.31.6.123\nbob:Applejack2022", "172.31.8.137\nbob:Applejack2022"]
 #argument_files = ["172.31.10.249\nbob:Applejack2022"]
