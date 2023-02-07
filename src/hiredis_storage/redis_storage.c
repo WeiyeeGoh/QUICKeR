@@ -12,6 +12,17 @@
 double store_time = 0.0;
 double retrieve_time = 0.0;
 
+
+int update_ip_addr (char* newip_addr) {
+	ip_addr = newip_addr;
+}
+
+
+int update_portnum (int new_portnum) {
+	portnum = new_portnum;
+}
+
+
 char *base64_enc(const char *str, int len)
 {
 	BIO *bio, *b64;
@@ -34,7 +45,8 @@ char *base64_enc(const char *str, int len)
 	BIO_flush(b64);
 	BIO_get_mem_ptr(b64, &bptr);
 
-	buf = malloc(bptr->length + 1);
+	buf = malloc(sizeof(char*) * ((bptr->length) + 100));
+
 	if (buf) {
 		memcpy(buf, bptr->data, bptr->length+1);
 		buf[bptr->length] = 0;
@@ -206,6 +218,46 @@ int close_redis (redisContext *conn) {
 	return 0;
 }
 
+int savedata(char *value, redisContext *conn) {
+	init_redis (conn);
+
+	int size = 9 + strlen (value) + 1;
+
+	buff[0] = 0;
+	strncat (buff, "SAVEDATA ", 9);
+	strncat (buff, value, strlen(value));
+
+	buff[size] = 0;
+
+
+	sendall(sockfd, buff, size);
+
+	recvall(sockfd, buff, MAX);
+
+	close (sockfd);
+	return 0;
+}
+
+int populate(char *value, redisContext *conn) {
+	init_redis (conn);
+
+	int size = 9 + strlen (value) + 1;
+
+	buff[0] = 0;
+	strncat (buff, "POPULATE ", 9);
+	strncat (buff, value, strlen(value));
+
+	buff[size] = 0;
+
+
+	sendall(sockfd, buff, size);
+
+	recvall(sockfd, buff, MAX);
+
+	close (sockfd);
+	return 0;
+}
+
 
 int set(char *key, char *value, int value_length, redisContext *conn) {
 
@@ -289,6 +341,8 @@ char** getall (int numkeys, char** keys, int**sizes, redisContext *conn) {
 	*sizes = malloc(numkeys);
 	//printf("addr: %d\n", *sizes);
 
+	//printf("strlen of data: %d\n", strlen(values[0]));
+
 	for (int i = 0; i < numkeys; i++) {
 		int result_length;
 		ret[i] = base64_dec(values[i], strlen(values[i]), &result_length);
@@ -302,6 +356,10 @@ char** getall (int numkeys, char** keys, int**sizes, redisContext *conn) {
 	}
 	free (values[0]);
 	free (values);
+
+	// for (int i = 0; i < numkeys; i++) {
+	// 	printf("size: %d\n", (*sizes)[i]);
+	// }
 
 
 	close (sockfd);
@@ -320,6 +378,11 @@ int setall (int numkeys, char** keys, char** values, int** value_sizes, redisCon
 
 		char* b64encoded = base64_enc(values[i], value_sizes[i]);
 
+		// if (i == 3) {
+		// 	printf("SET KEY: %s\n", keys[i]);
+	 //    	printf("SET VALUE: %s\n", b64encoded);
+	 //    }
+
 		strncat (buff, keys[i], strlen(keys[i]));    
 		strncat (buff, " ", 1);
 		strncat (buff, b64encoded, strlen(b64encoded));
@@ -333,6 +396,36 @@ int setall (int numkeys, char** keys, char** values, int** value_sizes, redisCon
 	sendall(sockfd, buff, size);
 	recvall(sockfd, buff, MAX);
 
+	close (sockfd);
+	return 1;
+}
+
+int send_root_key (int root_key, redisContext *conn) {
+
+	init_redis(conn);
+
+	int size = 8;
+	buff[0] = 0;
+	strncat (buff, "ROOTKEY ", size);
+
+
+    char root_key_string[15];
+    sprintf(root_key_string, "%d", root_key);
+    //printf("root_key_string: %s\n", root_key_string);
+    char* b64_root_key = base64_enc((char*) root_key_string, 15);
+    //printf("b64_root_key: %s\n", b64_root_key);
+
+
+	strncat (buff, b64_root_key, strlen(b64_root_key));
+	size += strlen(b64_root_key) + 2;
+
+	sendall(sockfd, buff, size);
+	recvall(sockfd, buff, MAX);
+
+	//printf("GOD BACK STUFF\n");
+
+
+	free(b64_root_key);
 	close (sockfd);
 	return 1;
 }

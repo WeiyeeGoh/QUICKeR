@@ -7,13 +7,14 @@ import time
 import datetime
 import os
 
+
 # OLD REDIS MACHINE
 #argument_files = ["172.31.6.123\nbob:Applejack2022", "172.31.8.137\nbob:Applejack2022"]
 #argument_files = ["172.31.10.249\nbob:Applejack2022"]
 
 # NEW KEYDB MACHINE
 argument_files = ["172.31.7.183\nbob:Applejack2022\n"] 
-private_key_pem = "<<YOUR_PRIVATE_KEY_PEM_FILENAME>>"
+private_key_pem = "../../.ssh/lawrence-ucsb-test-1.pem"
 
 activated_client_indexes = None
 
@@ -42,7 +43,7 @@ print(all_ip_addresses)
 # Set up the command_list
 output_logname = ""
 if sys.argv[1] == "pull":
-    cmd = "cd QUICKeR; git reset --hard HEAD; git checkout main; git reset --hard HEAD; git pull origin main"
+    cmd = "cd QUICKeR; git reset --hard HEAD; git checkout endtoend; git reset --hard HEAD; git pull origin endtoend"
     command_list = [cmd] * len(all_ip_addresses)
 elif sys.argv[1] == "run":
     date = datetime.datetime.now()

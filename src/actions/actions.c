@@ -18,7 +18,7 @@ print_as_hex_values(uint8_t* ciphertext, int ciphertext_length) {
         fprintf(stderr, "Could not allocate hex array\n");
         return -1;
     }
-    printf("Downloaded ctxt data: %s\n", hex_array);
+    //printf("Downloaded ctxt data: %s\n", hex_array);
     if (NULL != hex_array) {
         free(hex_array);
     }
@@ -133,20 +133,32 @@ int encrypt_and_upload(CK_SESSION_HANDLE_PTR session, CK_OBJECT_HANDLE wrapping_
     // uint8_t kv_key_wrap [9] = {'a', 'a', 'a', '-', 'w','r','a','p', 0};
     // uint8_t kv_key_data [9] = {'a', 'a', 'a', '-', 'd','a','t','a', 0};
 
+
+
     
     start = get_time_in_seconds();
+    // Setup Keys to Lookup Values on Redis Store
     char wrap_text[] = "wrap_";
     char data_text[] = "data_";
+    //char ctxt_version_number[] = "ctxt_version_";
+    char root_key_version_number[] = "root_version_";
 
     char* kv_key_wrap = malloc(strlen(wrap_text) + strlen(ciphertext_id)+1);
     char* kv_key_data = malloc(strlen(data_text) + strlen(ciphertext_id)+1);
+    char* kv_key_rkvn = malloc(strlen(root_key_version_number) + strlen(ciphertext_id)+1);
+
     kv_key_wrap[0] = '\0';
     kv_key_data[0] = '\0';
+    kv_key_rkvn[0] = '\0';
 
     strcat(kv_key_wrap, wrap_text);
     strcat(kv_key_wrap, ciphertext_id);
     strcat(kv_key_data, data_text);
     strcat(kv_key_data, ciphertext_id);
+    strcat(kv_key_rkvn, root_key_version_number);
+    strcat(kv_key_rkvn, ciphertext_id);
+
+
     end = get_time_in_seconds();
     time_counter_encryption_storekey_operation += (end - start);
             
@@ -193,6 +205,11 @@ int encrypt_and_upload(CK_SESSION_HANDLE_PTR session, CK_OBJECT_HANDLE wrapping_
     end = get_time_in_seconds();
     time_counter_encryption_wrap_dek += ((double) (end - start));
 
+    // Convert key handle to a string and then into base64
+    char key_handle_string[15];
+    sprintf(key_handle_string, "%d", wrapping_key_handle);
+    char* b64_key_handle = base64_enc((char*) key_handle_string, 15);
+
     start = get_time_in_seconds();
     // Encrypt Message using Decryption Key
     int BUF_CONST = 32 + message_len;    
@@ -224,10 +241,10 @@ int encrypt_and_upload(CK_SESSION_HANDLE_PTR session, CK_OBJECT_HANDLE wrapping_
     // set(kv_key_wrap, wrapped_key, wrapped_len, conn);
     // set(kv_key_data, ciphertext, buffer_length, conn);
 
-    char* keys[2] = {kv_key_wrap, kv_key_data};
-    char* values[2] = {wrapped_key, ciphertext};
-    char* value_sizes[2] = {wrapped_len, buffer_length};
-    setall(2, keys, values, value_sizes, conn);
+    char* keys[3] = {kv_key_wrap, kv_key_data, kv_key_rkvn};
+    char* values[3] = {wrapped_key, ciphertext, b64_key_handle};
+    char* value_sizes[3] = {wrapped_len, buffer_length, 15};
+    setall(4, keys, values, value_sizes, conn);
     //close_redis (conn);
     /* End New Redis Stuff */
     end = get_time_in_seconds();
@@ -648,13 +665,18 @@ int updatable_encrypt_and_upload(CK_SESSION_HANDLE_PTR session,
     char wrap_text[] = "wrap_";
     char header_text[] = "header_";
     char data_text[] = "data_";
-    
+    //char ctxt_version_number[] = "ctxt_version_";
+    char root_key_version_number[] = "root_version_";
+
     char* kv_key_wrap = malloc(strlen(wrap_text) + strlen(ciphertext_id)+1);
     char* kv_key_header = malloc(strlen(header_text) + strlen(ciphertext_id)+1);
     char* kv_key_data = malloc(strlen(data_text) + strlen(ciphertext_id)+1);
+    char* kv_key_rkvn = malloc(strlen(root_key_version_number) + strlen(ciphertext_id)+1);
+
     kv_key_wrap[0] = '\0';
     kv_key_header[0] = '\0';
     kv_key_data[0] = '\0';
+    kv_key_rkvn[0] = '\0';
 
     strcat(kv_key_wrap, wrap_text);
     strcat(kv_key_wrap, ciphertext_id);
@@ -662,6 +684,8 @@ int updatable_encrypt_and_upload(CK_SESSION_HANDLE_PTR session,
     strcat(kv_key_header, ciphertext_id);
     strcat(kv_key_data, data_text);
     strcat(kv_key_data, ciphertext_id);
+    strcat(kv_key_rkvn, root_key_version_number);
+    strcat(kv_key_rkvn, ciphertext_id);
 
     // Encrypt Data using Updatable Encryption
     AE_key ae_key;
@@ -708,6 +732,13 @@ int updatable_encrypt_and_upload(CK_SESSION_HANDLE_PTR session,
     }
     double end = get_time_in_seconds();
     time_counter_encryption_wrap_dek += ((double) (end - start));
+
+    // Convert key handle to a string and then into base64
+    char key_handle_string[15];
+    bzero(key_handle_string,15);
+    sprintf(key_handle_string, "%d", wrapping_key_handle);
+    // char* b64_key_handle = base64_enc((char*) key_handle_string, 15);
+    // printf("b64_key_handle: %s\n", b64_key_handle);
     
 
     /* Upload Header and Ciphertext (no wrap yet) */
@@ -715,10 +746,10 @@ int updatable_encrypt_and_upload(CK_SESSION_HANDLE_PTR session,
     // set(kv_key_wrap, (char*)wrapped_key, wrapped_len, conn);
     // set(kv_key_header, &ciphertext_hat, sizeof (ct_hat_data_en), conn);
     // set(kv_key_data, ciphertext, buffer_length, conn);
-    char* keys[3] = {kv_key_wrap, kv_key_header, kv_key_data};
-    char* values[3] = {(char*)wrapped_key, &ciphertext_hat, ciphertext};
-    char* value_sizes[3] = {wrapped_len, sizeof (ct_hat_data_en), buffer_length};
-    setall(3, keys, values, value_sizes, conn);
+    char* keys[4] = {kv_key_wrap, kv_key_header, kv_key_data, kv_key_rkvn};
+    char* values[4] = {(char*)wrapped_key, &ciphertext_hat, ciphertext, key_handle_string};
+    char* value_sizes[4] = {wrapped_len, sizeof (ct_hat_data_en), buffer_length, 15};
+    setall(4, keys, values, value_sizes, conn);
 
 
     //char* b64_ciphertext_hat = base64_enc((char*)&ciphertext_hat, sizeof(ct_hat_data_en));
@@ -734,24 +765,33 @@ int updatable_encrypt_and_upload(CK_SESSION_HANDLE_PTR session,
     return 0;
 }
 
+
+
+//  WORKING HERE
+//  asdlfkads
 int updatable_download_and_decrypt( CK_SESSION_HANDLE_PTR session, 
-				    CK_OBJECT_HANDLE wrapping_key_handle,		    
 				    char* ciphertext_id, 
                                     char** retrieved_message,
                                     int* retrieved_message_length ) {
+    // CK_OBJECT_HANDLE wrapping_key_handle will be deprecated
 
 
     // Setup Keys to Lookup Values on Redis Store
     char wrap_text[] = "wrap_";
     char header_text[] = "header_";
     char data_text[] = "data_";
+    //char ctxt_version_number[] = "ctxt_version_";
+    char root_key_version_number[] = "root_version_";
 
     char* kv_key_wrap = malloc(strlen(wrap_text) + strlen(ciphertext_id)+1);
     char* kv_key_header = malloc(strlen(header_text) + strlen(ciphertext_id)+1);
     char* kv_key_data = malloc(strlen(data_text) + strlen(ciphertext_id)+1);
+    char* kv_key_rkvn = malloc(strlen(root_key_version_number) + strlen(ciphertext_id)+1);
+
     kv_key_wrap[0] = '\0';
     kv_key_header[0] = '\0';
     kv_key_data[0] = '\0';
+    kv_key_rkvn[0] = '\0';
 
     strcat(kv_key_wrap, wrap_text);
     strcat(kv_key_wrap, ciphertext_id);
@@ -759,6 +799,8 @@ int updatable_download_and_decrypt( CK_SESSION_HANDLE_PTR session,
     strcat(kv_key_header, ciphertext_id);
     strcat(kv_key_data, data_text);
     strcat(kv_key_data, ciphertext_id);
+    strcat(kv_key_rkvn, root_key_version_number);
+    strcat(kv_key_rkvn, ciphertext_id);
 
     //setup redis connection
     redisContext *conn = NULL;
@@ -773,18 +815,31 @@ int updatable_download_and_decrypt( CK_SESSION_HANDLE_PTR session,
     // uint8_t * ciphertext = (uint8_t *) get(kv_key_data, conn, &data_length);
 
 
-    char* kv_key[3];
+    char* kv_key[4];
     kv_key[0] = kv_key_wrap;
     kv_key[1] = kv_key_header;
     kv_key[2] = kv_key_data;
+    kv_key[3] = kv_key_rkvn;
     int* sizes;
-    char** downloaded_values = getall(3, kv_key, &sizes, conn);
+    char** downloaded_values = getall(4, kv_key, &sizes, conn);
     int wrap_length = sizes[0];
     char* ae_key_wrap = downloaded_values[0];
     int header_length = sizes[1];
     ct_hat_data_en* ciphertext_hat = (ct_hat_data_en*)downloaded_values[1];
     int data_length = sizes[2];
     uint8_t * ciphertext = (uint8_t *)downloaded_values[2];
+    // printf("......... DOWNLOADED MESSAGES FROM DB ..........\n");
+    // printf("......... Wrap Length: %d\n", wrap_length);
+    // printf("......... Header Length: %d\n", header_length);
+    // printf("......... Data Length: %d\n", data_length);
+    // printf("......... Key Wrap: %s\n", ae_key_wrap);
+    // printf("......... Data Length: %d\n", data_length);
+    // printf("......... Data Length: %d\n", data_length);
+    // printf("......... .......................... ..........\n");
+
+
+    CK_OBJECT_HANDLE wrapping_key_handle = atoi(downloaded_values[3]);
+
     
     free(downloaded_values);
     free(sizes);
@@ -818,6 +873,8 @@ int updatable_download_and_decrypt( CK_SESSION_HANDLE_PTR session,
         } else {
             printf("HSM_AES_DECRYPT ERROR\n");
         }
+        // printf("Wrap Length: %d\n", wrap_length);
+        // printf("Decryption Key Length: %d\n", decryption_key_length);
         fail_counter += 1;
         sleep(1);
         failcont = get_time_in_seconds();
@@ -833,16 +890,19 @@ int updatable_download_and_decrypt( CK_SESSION_HANDLE_PTR session,
     // Close Redis Connection
     //close_redis (conn);
 
+
     // AE_Decrypt
     uint8_t * decrypted_message = (uint8_t * ) malloc(data_length);
+    //bzero(decrypted_message, data_length);
     AE_Decrypt(ae_key, ciphertext_hat, ciphertext, decrypted_message, data_length - 32);
 
 
-
-    *retrieved_message_length = strlen(decrypted_message);
+    // this retrieved_message_length is currently incorrect
+    *retrieved_message_length = strlen(decrypted_message) + 1; // +1 because null terminator
     *retrieved_message = malloc( *retrieved_message_length);
     memset(*retrieved_message, 0, *retrieved_message_length);
     strncpy(*retrieved_message, decrypted_message, *retrieved_message_length);
+    //printf("retrieved_message_length: %d\n", *retrieved_message_length);
 
 
     free(decrypted_message);
@@ -852,24 +912,32 @@ int updatable_download_and_decrypt( CK_SESSION_HANDLE_PTR session,
     free(kv_key_wrap);
     free(kv_key_header);
     free(kv_key_data);
+    free(kv_key_rkvn);
     free(decryption_key);
 
     return 0;
 }
 
-int updatable_update_dek_and_ciphertext(CK_SESSION_HANDLE_PTR session, CK_OBJECT_HANDLE wrapping_key_handle,  char* ciphertext_id, int total_re_encrypts)
+int updatable_update_dek_and_ciphertext(CK_SESSION_HANDLE_PTR session,  char* ciphertext_id, int total_re_encrypts)
 {
     // Setup Keys to Lookup Values on Redis Store
     char wrap_text[] = "wrap_";
     char header_text[] = "header_";
     char data_text[] = "data_";
+    char root_key_version_number[] = "root_version_";
+    char ctxt_version_number[] = "ctxt_version_";
 
     char* kv_key_wrap = malloc(strlen(wrap_text) + strlen(ciphertext_id)+1);
     char* kv_key_header = malloc(strlen(header_text) + strlen(ciphertext_id)+1);
     char* kv_key_data = malloc(strlen(data_text) + strlen(ciphertext_id)+1);
+    char* kv_key_rkvn = malloc(strlen(root_key_version_number) + strlen(ciphertext_id)+1);
+    char* kv_key_ctxt_ver = malloc(strlen(ctxt_version_number) + strlen(ciphertext_id)+1);
+
     kv_key_wrap[0] = '\0';
     kv_key_header[0] = '\0';
     kv_key_data[0] = '\0';
+    kv_key_ctxt_ver[0] = '\0';
+    kv_key_rkvn[0] = '\0';
 
     strcat(kv_key_wrap, wrap_text);
     strcat(kv_key_wrap, ciphertext_id);
@@ -877,6 +945,10 @@ int updatable_update_dek_and_ciphertext(CK_SESSION_HANDLE_PTR session, CK_OBJECT
     strcat(kv_key_header, ciphertext_id);
     strcat(kv_key_data, data_text);
     strcat(kv_key_data, ciphertext_id);
+    strcat(kv_key_rkvn, root_key_version_number);
+    strcat(kv_key_rkvn, ciphertext_id);
+    strcat(kv_key_ctxt_ver, ctxt_version_number);
+    strcat(kv_key_ctxt_ver, ciphertext_id);
 
     //setup redis connection
     redisContext *conn = NULL;
@@ -888,15 +960,18 @@ int updatable_update_dek_and_ciphertext(CK_SESSION_HANDLE_PTR session, CK_OBJECT
     // int header_length = 0;
     // ct_hat_data_en* ciphertext_hat = (ct_hat_data_en*)get(kv_key_header, conn, &header_length);
 
-    char** kv_keys[2];
+    char** kv_keys[3];
     kv_keys[0] = kv_key_wrap;
     kv_keys[1] = kv_key_header;
+    kv_keys[2] = kv_key_rkvn;
     int* sizes;
-    char** downloaded_values = getall(2, kv_keys, &sizes, conn);
+    char** downloaded_values = getall(3, kv_keys, &sizes, conn);
     int wrap_length = sizes[0];
     char* ae_key_wrap = downloaded_values[0];
     int header_length = sizes[1];
     ct_hat_data_en* ciphertext_hat = (ct_hat_data_en*)downloaded_values[1];
+
+    CK_OBJECT_HANDLE wrapping_key_handle = atoi(downloaded_values[2]);
 
     free (downloaded_values);
     free (sizes);
@@ -988,10 +1063,10 @@ int updatable_update_dek_and_ciphertext(CK_SESSION_HANDLE_PTR session, CK_OBJECT
     
     //printf("strlen stfu\n");
 
-    int strsize = strlen ("UP_UPDATE ") + strlen (kv_key_wrap) + 1 + strlen (kv_key_header) + 1 + strlen (kv_key_data) + 1 + strlen (b64_aekey_wrap2) + 1 + strlen (b64_delta) + 1;
+    int strsize = strlen ("UP_UPDATE ") + strlen (kv_key_wrap) + 1 + strlen (kv_key_header) + 1 + strlen (kv_key_data) + 1 + strlen (kv_key_ctxt_ver) + 1 + strlen (b64_aekey_wrap2) + 1 + strlen (b64_delta) + 1;
     char* sendbuf = (char*)malloc (strsize * sizeof (char));
     bzero (sendbuf, strsize);
-    sprintf (sendbuf, "UP_UPDATE %s %s %s %s %s", kv_key_wrap, kv_key_header, kv_key_data, b64_aekey_wrap2, b64_delta);
+    sprintf (sendbuf, "UP_UPDATE %s %s %s %s %s %s", kv_key_wrap, kv_key_header, kv_key_data, kv_key_ctxt_ver, b64_aekey_wrap2, b64_delta);
 
     //printf("Hello\n");
     init_redis (&conn);

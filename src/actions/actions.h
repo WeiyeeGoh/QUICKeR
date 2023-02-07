@@ -119,12 +119,10 @@ int updatable_encrypt_and_upload(CK_SESSION_HANDLE_PTR session,
                                 int total_re_encrypts);
 
 int updatable_download_and_decrypt( CK_SESSION_HANDLE_PTR session, 
-                        	    CK_OBJECT_HANDLE wrapping_key_handle,  
-				    char* ciphertext_id, 
+                                    char* ciphertext_id, 
                                     char** retrieved_message,
                                     int* retrieved_message_length);
 
-int updatable_update_dek_and_ciphertext(CK_SESSION_HANDLE_PTR session, 
-                        		CK_OBJECT_HANDLE wrapping_key_handle, 
-					char* ciphertext_id, 
-                                        int total_re_encrypts);
+int updatable_update_dek_and_ciphertext(    CK_SESSION_HANDLE_PTR session, 
+                                            char* ciphertext_id, 
+                                            int total_re_encrypts);

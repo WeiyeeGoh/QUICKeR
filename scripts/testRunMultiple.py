@@ -5,11 +5,14 @@ import time
 import datetime
 
 
-client_machines = "routine_operations"
-update_machines = "ciphertext_updates"
+# client_machines = "routine_operations"
+# update_machines = "ciphertext_updates"
+
+client_machines = "routine_operations_updatable_encryption"
+update_machines = "ciphertext_updates_updatable_encryption"
 
 #experiment_numbers = [[4,0]]
-experiment_numbers = [[8,0], [8,2], [8,4], [8,8], [8,16],[8,24]]
+experiment_numbers = [[4,0]]
 #experiment_numbers = [[8,8]]
 #experiment_numbers = [[0,4],[0,8]]
 experimentList = []
